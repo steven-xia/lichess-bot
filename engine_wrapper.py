@@ -14,11 +14,11 @@ def create_engine(config, board):
     cfg = config["engine"]
     engine_path = os.path.join(cfg["dir"], cfg["name"])
     engine_type = cfg.get("protocol")
-    engine_options = cfg.get("engine_options")
+    engine_options = cfg.get("engine_options", {})
     commands = [engine_path]
-    if engine_options:
-        for k, v in engine_options.items():
-            commands.append("--{}={}".format(k, v))
+
+    for k, v in engine_options.items():
+        commands.append("--{}={}".format(k, v))
 
     silence_stderr = cfg.get("silence_stderr", False)
     ponder = cfg.get("ponder", False)
@@ -58,17 +58,14 @@ class EngineWrapper:
 
     @staticmethod
     def print_handler_stats(info, stats):
-        for stat in stats:
-            if stat in info:
-                print("    {}: {}".format(stat, info[stat]))
+        for stat in filter(lambda s: s in info, stats):
+            print("    {}: {}".format(stat, info[stat]))
 
     @staticmethod
     def get_handler_stats(info, stats):
         stats_str = []
-        for stat in stats:
-            if stat in info:
-                stats_str.append("{}: {}".format(stat, info[stat]))
-
+        for stat in filter(lambda s: s in info, stats):
+            stats_str.append("{}: {}".format(stat, info[stat]))
         return stats_str
 
 
@@ -88,6 +85,7 @@ class UCIEngine(EngineWrapper):
             "UCI_Variant": type(board).uci_variant,
             "UCI_Chess960": board.chess960
         })
+
         self.engine.position(board)
 
         info_handler = chess.uci.InfoHandler()
@@ -176,7 +174,6 @@ class XBoardEngine(EngineWrapper):
     def __init__(self, board, commands, options=None, silence_stderr=False, ponder_on=False):
         commands = commands[0] if len(commands) == 1 else commands
         self.engine = chess.xboard.popen_engine(commands, stderr=subprocess.DEVNULL if silence_stderr else None)
-
         self.engine.xboard()
 
         if board.chess960:
@@ -221,7 +218,6 @@ class XBoardEngine(EngineWrapper):
         self.engine.setboard(board)
         self.engine.level(0, 0, movetime / 1000, 0)
         bestmove = self.engine.go()
-
         return bestmove
 
     def search(self, board, wtime, btime, winc, binc):

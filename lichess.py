@@ -30,12 +30,12 @@ ENDPOINTS = {
 
 # docs: https://lichess.org/api
 class Lichess:
-
     def __init__(self, token, url, version):
         self.version = version
         self.header = {
             "Authorization": "Bearer {}".format(token)
         }
+
         self.baseUrl = url
         self.session = requests.Session()
         self.session.headers.update(self.header)
@@ -44,9 +44,7 @@ class Lichess:
     def is_final(exception):
         return isinstance(exception, HTTPError) and exception.response.status_code < 500
 
-    @backoff.on_exception(backoff.expo,
-                          (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError),
-                          max_time=120,
+    @backoff.on_exception(backoff.expo, (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError), max_time=120,
                           giveup=is_final)
     def api_get(self, path):
         url = urljoin(self.baseUrl, path)
@@ -54,9 +52,7 @@ class Lichess:
         response.raise_for_status()
         return response.json()
 
-    @backoff.on_exception(backoff.expo,
-                          (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError),
-                          max_time=20,
+    @backoff.on_exception(backoff.expo, (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError), max_time=20,
                           giveup=is_final)
     def api_post(self, path, data=None):
         url = urljoin(self.baseUrl, path)

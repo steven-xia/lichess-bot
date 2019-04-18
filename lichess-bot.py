@@ -18,7 +18,7 @@ import engine_wrapper
 import lichess
 import logging_pool
 import model
-from ColorLogger import enable_color_logging
+from color_logger import enable_color_logging
 from config import load_config
 from conversation import Conversation, ChatLine
 
@@ -87,12 +87,16 @@ def start(li, user_profile, engine_factory, config):
     with logging_pool.LoggingPool(max_games + 1) as pool:
         while not terminated:
             event = control_queue.get()
+
             if event["type"] == "terminated":
                 break
+
             elif event["type"] == "local_game_done":
                 busy_processes -= 1
                 logger.info(
-                    "+++ Process Free. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
+                    "+++ Process Free. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes)
+                )
+
             elif event["type"] == "challenge":
                 challenge = model.Challenge(event["challenge"])
                 if challenge.is_supported(challenge_config) and not challenge.is_ignore(challenge_config):
@@ -110,17 +114,21 @@ def start(li, user_profile, engine_factory, config):
                     except HTTPError as exception:
                         if exception.response.status_code != 404:  # ignore missing challenge
                             raise exception
+
             elif event["type"] == "gameStart":
                 if queued_processes <= 0:
                     logger.debug("Something went wrong. Game is starting and we don't have a queued process")
                 else:
                     queued_processes -= 1
                 game_id = event["game"]["id"]
-                pool.apply_async(play_game,
-                                 [li, game_id, control_queue, engine_factory, user_profile, config, challenge_queue])
+                pool.apply_async(
+                    play_game, [li, game_id, control_queue, engine_factory, user_profile, config, challenge_queue]
+                )
+
                 busy_processes += 1
                 logger.info(
-                    "--- Process Used. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
+                    "--- Process Used. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes)
+                )
 
             # keep processing the queue until empty or max_games is reached
             while (queued_processes + busy_processes) < max_games and challenge_queue:
@@ -130,7 +138,8 @@ def start(li, user_profile, engine_factory, config):
                     logger.info("    Accept {}".format(challenge))
                     queued_processes += 1
                     logger.info(
-                        "--- Process Queue. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
+                        "--- Process Queue. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes)
+                    )
                 except HTTPError as exception:
                     if exception.response.status_code == 404:  # ignore missing challenge
                         logger.info("    Skip missing {}".format(challenge))
@@ -169,8 +178,10 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
         for binary_chunk in lines:
             upd = json.loads(binary_chunk.decode('utf-8')) if binary_chunk else None
             u_type = upd["type"] if upd else "ping"
+
             if u_type == "chatLine":
                 conversation.react(ChatLine(upd), game)
+
             elif u_type == "gameState":
                 game.state = upd
                 moves = upd["moves"].split()
@@ -181,6 +192,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                         accel = 1 - max(0, min(100, len(moves) - 20)) / 150
                         sleep = min(5, delay * accel)
                         time.sleep(sleep)
+
                     best_move = None
                     if polyglot_cfg.get("enabled") and len(moves) <= polyglot_cfg.get("max_depth", 8) * 2 - 1:
                         best_move = get_book_move(board, book_cfg)
@@ -188,19 +200,15 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                         best_move = engine.search(board, upd["wtime"], upd["btime"], upd["winc"], upd["binc"])
                     li.make_move(game.id, best_move)
                     game.abort_in(config.get("abort_time", 20))
+
             elif u_type == "ping":
                 if game.should_abort_now():
                     logger.info("    Aborting {} by lack of activity".format(game.url()))
                     li.abort(game.id)
 
     except HTTPError as err:
-        ongoing_games = li.get_ongoing_games()
-        game_over = True
-        for ongoing_game in ongoing_games:
-            if ongoing_game["gameId"] == game.id:
-                game_over = False
-                break
-        if not game_over:
+        ongoing_game = tuple(filter(lambda g: g["gameID"] == game.id, li.get_ongoing_games()))
+        if ongoing_game != ():
             logger.warning("Abandoning game due to HTTP " + response.status_code)
 
     except (RemoteDisconnected, ChunkedEncodingError, ConnectionError, ProtocolError) as exception:

@@ -47,6 +47,7 @@ def add_coloring_to_emit_windows(fn):
         FOREGROUND_RED = 0x0004  # text color contains red.
         FOREGROUND_INTENSITY = 0x0008  # text color is intensified.
         FOREGROUND_WHITE = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED
+
         # winbase.h
         STD_INPUT_HANDLE = -10
         STD_OUTPUT_HANDLE = -11
@@ -86,13 +87,15 @@ def add_coloring_to_emit_windows(fn):
             color = FOREGROUND_MAGENTA
         else:
             color = FOREGROUND_WHITE
+
         # noinspection PyProtectedMember
         args[0]._set_color(color)
 
         ret = fn(*args)
+
         # noinspection PyProtectedMember
         args[0]._set_color(FOREGROUND_WHITE)
-        # print "after"
+
         return ret
 
     return new
@@ -113,12 +116,11 @@ def add_coloring_to_emit_ansi(fn):
         elif levelno >= 10:
             color = '\x1b[32m'  # green
             # color = '\x1b[90m' # bright black
-            #
-            # #'\x1b[35m' # pink
+            # color = '\x1b[35m' # pink
         else:
             color = '\x1b[0m'  # normal
+
         args[1].msg = color + args[1].msg + '\x1b[0m'  # normal
-        # print "after"
         return fn(*args)
 
     return new

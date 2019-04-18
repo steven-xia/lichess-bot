@@ -5,25 +5,26 @@ import yaml
 
 
 def load_config(config_file):
-    with open(config_file) as stream:
+    with open(config_file) as file_stream:
         try:
-            config = yaml.load(stream)
+            config = yaml.load(file_stream)
         except Exception as err:
             print("There appears to be a syntax problem with your config.yml")
             raise err
 
         # [section, type, error message]
-        sections = [["token", str, "Section `token` must be a string wrapped in quotes."],
-                    ["url", str, "Section `url` must be a string wrapped in quotes."],
-                    ["engine", dict, "Section `engine` must be a dictionary with indented keys followed by colons.."],
-                    ["challenge", dict,
-                     "Section `challenge` must be a dictionary with indented keys followed by colons.."]]
+        sections = [
+            ["token", str, "Section `token` must be a string wrapped in quotes."],
+            ["url", str, "Section `url` must be a string wrapped in quotes."],
+            ["engine", dict, "Section `engine` must be a dictionary with indented keys followed by colons."],
+            ["challenge", dict, "Section `challenge` must be a dictionary with indented keys followed by colons.."]]
         for section in sections:
             if section[0] not in config:
-                raise Exception("Your config.yml does not have required section `{}`.".format(section[0]))
+                raise Exception(f"Your config.yml does not have required section `{section[0]}`.")
             elif not isinstance(config[section[0]], section[1]):
                 raise Exception(section[2])
 
+        # [section, type, error message]
         engine_sections = [["dir", str, "´dir´ must be a string wrapped in quotes."],
                            ["name", str, "´name´ must be a string wrapped in quotes."]]
         for subsection in engine_sections:
