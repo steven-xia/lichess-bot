@@ -14,13 +14,10 @@ from chess.variant import find_variant
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
 from urllib3.exceptions import ProtocolError
 
-import engine_wrapper
-import lichess
-import logging_pool
-import model
-from color_logger import enable_color_logging
-from config import load_config
-from conversation import Conversation, ChatLine
+from src import lichess, model, engine_wrapper, logging_pool
+from src.color_logger import enable_color_logging
+from src.config import load_config
+from src.conversation import Conversation, ChatLine
 
 logger = logging.getLogger(__name__)
 
