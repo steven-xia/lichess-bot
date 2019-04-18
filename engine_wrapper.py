@@ -1,9 +1,13 @@
+import copy
 import os
-import chess
-import chess.xboard
-import chess.uci
-import backoff
 import subprocess
+import time
+
+import backoff
+import chess
+import chess.uci
+import chess.xboard
+
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=120)
 def create_engine(config, board):
@@ -17,16 +21,17 @@ def create_engine(config, board):
             commands.append("--{}={}".format(k, v))
 
     silence_stderr = cfg.get("silence_stderr", False)
+    ponder = cfg.get("ponder", False)
 
     if engine_type == "xboard":
         return XBoardEngine(board, commands, cfg.get("xboard_options", {}) or {}, silence_stderr)
 
-    return UCIEngine(board, commands, cfg.get("uci_options", {}) or {}, silence_stderr)
+    return UCIEngine(board, commands, cfg.get("uci_options", {}) or {}, silence_stderr, ponder)
 
 
 class EngineWrapper:
 
-    def __init__(self, board, commands, options=None, silence_stderr=False):
+    def __init__(self, board, commands, options=None, silence_stderr=False, ponder=False):
         pass
 
     def set_time_control(self, game):
@@ -63,11 +68,11 @@ class EngineWrapper:
 
 class UCIEngine(EngineWrapper):
 
-    def __init__(self, board, commands, options, silence_stderr=False):
+    def __init__(self, board, commands, options, silence_stderr=False, ponder=False):
         commands = commands[0] if len(commands) == 1 else commands
         self.go_commands = options.get("go_commands", {})
 
-        self.engine = chess.uci.popen_engine(commands, stderr = subprocess.DEVNULL if silence_stderr else None)
+        self.engine = chess.uci.popen_engine(commands, stderr=subprocess.DEVNULL if silence_stderr else None)
         self.engine.uci()
 
         if options:
@@ -82,35 +87,79 @@ class UCIEngine(EngineWrapper):
         info_handler = chess.uci.InfoHandler()
         self.engine.info_handlers.append(info_handler)
 
+        self.ponder_on = ponder
+        self.ponder_command = False
+        self.ponder_board = chess.Board()
 
     def first_search(self, board, movetime):
         self.engine.position(board)
         best_move, _ = self.engine.go(movetime=movetime)
         return best_move
 
-
     def search(self, board, wtime, btime, winc, binc):
-        self.engine.position(board)
+        search_start_time = time.time()
         cmds = self.go_commands
-        best_move, _ = self.engine.go(
+
+        best_move = None
+        ponder_move = None
+
+        if self.ponder_command:
+            if self.ponder_board.fen() == board.fen():
+                self.engine.ponderhit()
+                while not self.ponder_command.done():
+                    pass
+                best_move, ponder_move = self.ponder_command.result()
+            else:
+                self.engine.stop()
+
+            self.ponder_command = False
+
+        if best_move is None:
+            self.engine.position(board)
+            best_move, ponder_move = self.engine.go(
+                wtime=wtime,
+                btime=btime,
+                winc=winc,
+                binc=binc,
+                depth=cmds.get("depth"),
+                nodes=cmds.get("nodes"),
+                movetime=cmds.get("movetime")
+            )
+
+        if self.ponder_on and ponder_move is not None:
+            if board.turn == chess.WHITE:
+                wtime -= int(1000 * (time.time() - search_start_time))
+            else:
+                btime -= int(1000 * (time.time() - search_start_time))
+
+            self.ponder_board = copy.deepcopy(board)
+            self.ponder_board.push(best_move)
+            self.ponder_board.push(ponder_move)
+            self.ponder(self.ponder_board, wtime, btime, winc, binc)
+
+        return best_move
+
+    def ponder(self, board, wtime, btime, winc, binc):
+        cmds = self.go_commands
+
+        self.engine.position(board)
+        self.ponder_command = self.engine.go(
             wtime=wtime,
             btime=btime,
             winc=winc,
             binc=binc,
             depth=cmds.get("depth"),
             nodes=cmds.get("nodes"),
-            movetime=cmds.get("movetime")
+            movetime=cmds.get("movetime"),
+            ponder=True,
+            async_callback=True
         )
-        return best_move
-
 
     def stop(self):
         self.engine.stop()
 
-
     def print_stats(self):
         self.print_handler_stats(self.engine.info_handlers[0].info, ["string", "depth", "nps", "nodes", "score"])
-
 
     def get_stats(self):
         return self.get_handler_stats(self.engine.info_handlers[0].info, ["depth", "nps", "nodes", "score"])
@@ -118,9 +167,9 @@ class UCIEngine(EngineWrapper):
 
 class XBoardEngine(EngineWrapper):
 
-    def __init__(self, board, commands, options=None, silence_stderr=False):
+    def __init__(self, board, commands, options=None, silence_stderr=False, ponder=False):
         commands = commands[0] if len(commands) == 1 else commands
-        self.engine = chess.xboard.popen_engine(commands, stderr = subprocess.DEVNULL if silence_stderr else None)
+        self.engine = chess.xboard.popen_engine(commands, stderr=subprocess.DEVNULL if silence_stderr else None)
 
         self.engine.xboard()
 
@@ -184,7 +233,6 @@ class XBoardEngine(EngineWrapper):
 
     def get_stats(self):
         return self.get_handler_stats(self.engine.post_handlers[0].post, ["depth", "nodes", "score"])
-
 
     def name(self):
         try:
