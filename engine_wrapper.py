@@ -31,8 +31,12 @@ def create_engine(config, board):
 
 class EngineWrapper:
 
-    def __init__(self, board, commands, options=None, silence_stderr=False, ponder=False):
-        pass
+    def __init__(self, board, commands, options=None, silence_stderr=False, ponder_on=False):
+        self.board = board
+        self.commands = commands
+        self.options = options
+        self.silence_stderr = silence_stderr
+        self.ponder_on = ponder_on
 
     def set_time_control(self, game):
         pass
@@ -52,12 +56,14 @@ class EngineWrapper:
     def quit(self):
         self.engine.quit()
 
-    def print_handler_stats(self, info, stats):
+    @staticmethod
+    def print_handler_stats(info, stats):
         for stat in stats:
             if stat in info:
                 print("    {}: {}".format(stat, info[stat]))
 
-    def get_handler_stats(self, info, stats):
+    @staticmethod
+    def get_handler_stats(info, stats):
         stats_str = []
         for stat in stats:
             if stat in info:
@@ -68,7 +74,7 @@ class EngineWrapper:
 
 class UCIEngine(EngineWrapper):
 
-    def __init__(self, board, commands, options, silence_stderr=False, ponder=False):
+    def __init__(self, board, commands, options, silence_stderr=False, ponder_on=False):
         commands = commands[0] if len(commands) == 1 else commands
         self.go_commands = options.get("go_commands", {})
 
@@ -87,7 +93,7 @@ class UCIEngine(EngineWrapper):
         info_handler = chess.uci.InfoHandler()
         self.engine.info_handlers.append(info_handler)
 
-        self.ponder_on = ponder
+        self.ponder_on = ponder_on
         self.ponder_command = False
         self.ponder_board = chess.Board()
 
@@ -167,7 +173,7 @@ class UCIEngine(EngineWrapper):
 
 class XBoardEngine(EngineWrapper):
 
-    def __init__(self, board, commands, options=None, silence_stderr=False, ponder=False):
+    def __init__(self, board, commands, options=None, silence_stderr=False, ponder_on=False):
         commands = commands[0] if len(commands) == 1 else commands
         self.engine = chess.xboard.popen_engine(commands, stderr=subprocess.DEVNULL if silence_stderr else None)
 
@@ -237,5 +243,5 @@ class XBoardEngine(EngineWrapper):
     def name(self):
         try:
             return self.engine.features.get("myname")
-        except:
+        except Exception:
             return None

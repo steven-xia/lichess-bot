@@ -1,6 +1,7 @@
+import multiprocessing
 import traceback
 from multiprocessing.pool import Pool
-import multiprocessing
+
 
 # Shortcut to multiprocessing's logger
 def error(msg, *args):
@@ -8,14 +9,14 @@ def error(msg, *args):
 
 
 class LogExceptions(object):
-    def __init__(self, callable):
-        self.__callable = callable
+    def __init__(self, callable_func):
+        self.__callable = callable_func
 
     def __call__(self, *args, **kwargs):
         try:
             result = self.__callable(*args, **kwargs)
 
-        except Exception as e:
+        except Exception as err:
             # Here we add some debugging help. If multiprocessing's
             # debugging is on, it will arrange to log the traceback
             error(traceback.format_exc())
@@ -28,5 +29,5 @@ class LogExceptions(object):
 
 
 class LoggingPool(Pool):
-    def apply_async(self, func, args=(), kwds={}, callback=None):
-        return Pool.apply_async(self, LogExceptions(func), args, kwds, callback)
+    def apply_async(self, func, args=(), kwargs={}, callback=None):
+        return Pool.apply_async(self, LogExceptions(func), args, kwargs, callback)

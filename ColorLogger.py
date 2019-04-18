@@ -16,8 +16,8 @@ by Sorin & Dave
 """
 
 import logging
-import sys
 import platform
+import sys
 
 
 def add_coloring_to_emit_windows(fn):

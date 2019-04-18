@@ -1,8 +1,8 @@
-import sys
 import time
 from urllib.parse import urljoin
 
-class Challenge():
+
+class Challenge:
     def __init__(self, c_info):
         self.id = c_info["id"]
         self.rated = c_info["rated"]
@@ -24,7 +24,7 @@ class Challenge():
     def is_supported_time_control(self, supported_speed, supported_increment_max, supported_increment_min):
         if self.increment < 0:
             return self.speed in supported_speed
-        return self.speed in supported_speed and self.increment <= supported_increment_max and self.increment >= supported_increment_min
+        return self.speed in supported_speed and supported_increment_max >= self.increment >= supported_increment_min
 
     def is_supported_mode(self, supported):
         return "rated" in supported if self.rated else "casual" in supported
@@ -37,7 +37,8 @@ class Challenge():
         inc_max = config.get("max_increment", 180)
         inc_min = config.get("min_increment", 0)
         modes = config["modes"]
-        return self.is_supported_time_control(tc, inc_max, inc_min) and self.is_supported_variant(variants) and self.is_supported_mode(modes)
+        return self.is_supported_time_control(tc, inc_max, inc_min) and self.is_supported_variant(
+            variants) and self.is_supported_mode(modes)
 
     def score(self):
         rated_bonus = 200 if self.rated else 0
@@ -51,18 +52,20 @@ class Challenge():
         return "{}{}".format(self.challenger_title + " " if self.challenger_title else "", self.challenger_name)
 
     def __str__(self):
-        return "{} {} challenge from {}({})".format(self.perf_name, self.mode(), self.challenger_full_name(), self.challenger_rating)
+        return "{} {} challenge from {}({})".format(self.perf_name, self.mode(), self.challenger_full_name(),
+                                                    self.challenger_rating)
 
     def __repr__(self):
         return self.__str__()
 
-class Game():
+
+class Game:
     def __init__(self, json, username, base_url, abort_time):
         self.username = username
         self.id = json.get("id")
         self.speed = json.get("speed")
         clock = json.get("clock", {}) or {}
-        self.clock_initial = clock.get("initial", 1000 * 3600 * 24 * 365 * 10) # unlimited = 10 years
+        self.clock_initial = clock.get("initial", 1000 * 3600 * 24 * 365 * 10)  # unlimited = 10 years
         self.clock_increment = clock.get("increment", 0)
         self.perf_name = json.get("perf").get("name") if json.get("perf") else "{perf?}"
         self.variant_name = json.get("variant")["name"]
@@ -86,7 +89,7 @@ class Game():
         return len(self.state["moves"]) < 6
 
     def abort_in(self, seconds):
-        if (self.is_abortable()):
+        if self.is_abortable():
             self.abort_at = time.time() + seconds
 
     def should_abort_now(self):
@@ -102,7 +105,7 @@ class Game():
         return self.__str__()
 
 
-class Player():
+class Player:
     def __init__(self, json):
         self.id = json.get("id")
         self.name = json.get("name")

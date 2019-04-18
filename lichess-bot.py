@@ -1,25 +1,26 @@
 import argparse
-import chess
-from chess.variant import find_variant
-import chess.polyglot
-import engine_wrapper
-import model
 import json
-import lichess
 import logging
 import multiprocessing
-import traceback
-import logging_pool
 import signal
-import sys
 import time
-import backoff
-from config import load_config
-from conversation import Conversation, ChatLine
+import traceback
 from functools import partial
+
+import backoff
+import chess
+import chess.polyglot
+from chess.variant import find_variant
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
 from urllib3.exceptions import ProtocolError
+
+import engine_wrapper
+import lichess
+import logging_pool
+import model
 from ColorLogger import enable_color_logging
+from config import load_config
+from conversation import Conversation, ChatLine
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +34,27 @@ __version__ = "1.1.4"
 
 terminated = False
 
+
 def signal_handler(signal, frame):
     global terminated
-    logger.debug("Recieved SIGINT. Terminating client.")
+    logger.debug("Received SIGINT. Terminating client.")
     terminated = True
+
 
 signal.signal(signal.SIGINT, signal_handler)
 
+
 def is_final(exception):
     return isinstance(exception, HTTPError) and exception.response.status_code < 500
+
 
 def upgrade_account(li):
     if li.upgrade_to_bot_account() is None:
         return False
 
-    logger.info("Succesfully upgraded to Bot Account!")
+    logger.info("Successfully upgraded to Bot Account!")
     return True
+
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=600, giveup=is_final)
 def watch_control_stream(control_queue, li):
@@ -65,6 +71,7 @@ def watch_control_stream(control_queue, li):
         traceback.print_exception(type(exception), exception, exception.__traceback__)
         control_queue.put_nowait({"type": "terminated"})
 
+
 def start(li, user_profile, engine_factory, config):
     challenge_config = config["challenge"]
     max_games = challenge_config.get("concurrency", 1)
@@ -77,28 +84,29 @@ def start(li, user_profile, engine_factory, config):
     busy_processes = 0
     queued_processes = 0
 
-    with logging_pool.LoggingPool(max_games+1) as pool:
+    with logging_pool.LoggingPool(max_games + 1) as pool:
         while not terminated:
             event = control_queue.get()
             if event["type"] == "terminated":
                 break
             elif event["type"] == "local_game_done":
                 busy_processes -= 1
-                logger.info("+++ Process Free. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
+                logger.info(
+                    "+++ Process Free. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
             elif event["type"] == "challenge":
-                chlng = model.Challenge(event["challenge"])
-                if chlng.is_supported(challenge_config):
-                    challenge_queue.append(chlng)
-                    if (challenge_config.get("sort_by", "best") == "best"):
+                challenge = model.Challenge(event["challenge"])
+                if challenge.is_supported(challenge_config):
+                    challenge_queue.append(challenge)
+                    if challenge_config.get("sort_by", "best") == "best":
                         list_c = list(challenge_queue)
                         list_c.sort(key=lambda c: -c.score())
                         challenge_queue = list_c
                 else:
                     try:
-                        li.decline_challenge(chlng.id)
-                        logger.info("    Decline {}".format(chlng))
+                        li.decline_challenge(challenge.id)
+                        logger.info("    Decline {}".format(challenge))
                     except HTTPError as exception:
-                        if exception.response.status_code != 404: # ignore missing challenge
+                        if exception.response.status_code != 404:  # ignore missing challenge
                             raise exception
             elif event["type"] == "gameStart":
                 if queued_processes <= 0:
@@ -106,32 +114,40 @@ def start(li, user_profile, engine_factory, config):
                 else:
                     queued_processes -= 1
                 game_id = event["game"]["id"]
-                pool.apply_async(play_game, [li, game_id, control_queue, engine_factory, user_profile, config, challenge_queue])
+                pool.apply_async(play_game,
+                                 [li, game_id, control_queue, engine_factory, user_profile, config, challenge_queue])
                 busy_processes += 1
-                logger.info("--- Process Used. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
-            while ((queued_processes + busy_processes) < max_games and challenge_queue): # keep processing the queue until empty or max_games is reached
-                chlng = challenge_queue.pop(0)
+                logger.info(
+                    "--- Process Used. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
+
+            # keep processing the queue until empty or max_games is reached
+            while (queued_processes + busy_processes) < max_games and challenge_queue:
+                challenge = challenge_queue.pop(0)
                 try:
-                    response = li.accept_challenge(chlng.id)
-                    logger.info("    Accept {}".format(chlng))
+                    response = li.accept_challenge(challenge.id)
+                    logger.info("    Accept {}".format(challenge))
                     queued_processes += 1
-                    logger.info("--- Process Queue. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
+                    logger.info(
+                        "--- Process Queue. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
                 except HTTPError as exception:
-                    if exception.response.status_code == 404: # ignore missing challenge
-                        logger.info("    Skip missing {}".format(chlng))
+                    if exception.response.status_code == 404:  # ignore missing challenge
+                        logger.info("    Skip missing {}".format(challenge))
                     else:
                         raise exception
+
     logger.info("Terminated")
     control_stream.terminate()
     control_stream.join()
+
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=600, giveup=is_final)
 def play_game(li, game_id, control_queue, engine_factory, user_profile, config, challenge_queue):
     response = li.get_game_stream(game_id)
     lines = response.iter_lines()
 
-    #Initial response of stream will be the full game info. Store it
-    game = model.Game(json.loads(next(lines).decode('utf-8')), user_profile["username"], li.baseUrl, config.get("abort_time", 20))
+    # Initial response of stream will be the full game info. Store it
+    game = model.Game(json.loads(next(lines).decode('utf-8')), user_profile["username"], li.baseUrl,
+                      config.get("abort_time", 20))
     board = setup_board(game)
     engine = engine_factory(board)
     conversation = Conversation(game, engine, li, __version__, challenge_queue)
@@ -166,7 +182,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                     best_move = None
                     if polyglot_cfg.get("enabled") and len(moves) <= polyglot_cfg.get("max_depth", 8) * 2 - 1:
                         best_move = get_book_move(board, book_cfg)
-                    if best_move == None:
+                    if best_move is None:
                         best_move = engine.search(board, upd["wtime"], upd["btime"], upd["winc"], upd["binc"])
                     li.make_move(game.id, best_move)
                     game.abort_in(config.get("abort_time", 20))
@@ -174,7 +190,8 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                 if game.should_abort_now():
                     logger.info("    Aborting {} by lack of activity".format(game.url()))
                     li.abort(game.id)
-    except HTTPError as e:
+
+    except HTTPError as err:
         ongoing_games = li.get_ongoing_games()
         game_over = True
         for ongoing_game in ongoing_games:
@@ -182,10 +199,12 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                 game_over = False
                 break
         if not game_over:
-            logger.warn("Abandoning game due to HTTP "+response.status_code)
+            logger.warning("Abandoning game due to HTTP " + response.status_code)
+
     except (RemoteDisconnected, ChunkedEncodingError, ConnectionError, ProtocolError) as exception:
         logger.error("Abandoning game due to connection error")
         traceback.print_exception(type(exception), exception, exception.__traceback__)
+
     finally:
         logger.info("--- {} Game over".format(game.url()))
         engine.quit()
@@ -197,7 +216,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
 def play_first_move(game, engine, board, li):
     moves = game.state["moves"].split()
     if is_engine_move(game, moves):
-        # need to hardcode first movetime since Lichess has 30 sec limit.
+        # need to hard code first movetime since Lichess has 30 sec limit.
         best_move = engine.first_search(board, 10000)
         li.make_move(game.id, best_move)
         return True
@@ -272,6 +291,7 @@ def update_board(board, move):
     board.push(uci_move)
     return board
 
+
 def intro():
     return r"""
     .   _/|
@@ -280,6 +300,7 @@ def intro():
     .  //__\
     .  )___(   Play on Lichess with a bot
     """ % __version__
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Play on Lichess with a bot')
