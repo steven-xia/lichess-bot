@@ -70,3 +70,9 @@ challenge:                   # incoming challenges
   modes:                     # game modes to accept
     - casual                 # unrated games
     - rated                  # rated games - must comment if the engine doesn't try to win
+  ignore:
+    - correspondence
+
+chat_commands:
+  hardware: "The hardware is not provided."
+  info: "There is no extra info provided."

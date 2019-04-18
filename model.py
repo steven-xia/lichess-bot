@@ -48,6 +48,12 @@ class Challenge:
     def mode(self):
         return "rated" if self.rated else "casual"
 
+    def is_ignore(self, config):
+        ignore = config.get("ignore", None)
+        if ignore and self.variant in ignore:
+            return True
+        return False
+
     def challenger_full_name(self):
         return "{}{}".format(self.challenger_title + " " if self.challenger_title else "", self.challenger_name)
 

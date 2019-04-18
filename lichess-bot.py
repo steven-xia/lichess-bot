@@ -95,12 +95,14 @@ def start(li, user_profile, engine_factory, config):
                     "+++ Process Free. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes))
             elif event["type"] == "challenge":
                 challenge = model.Challenge(event["challenge"])
-                if challenge.is_supported(challenge_config):
+                if challenge.is_supported(challenge_config) and not challenge.is_ignore(challenge_config):
                     challenge_queue.append(challenge)
                     if challenge_config.get("sort_by", "best") == "best":
                         list_c = list(challenge_queue)
                         list_c.sort(key=lambda c: -c.score())
                         challenge_queue = list_c
+                elif challenge.is_ignore(challenge_config):
+                    continue
                 else:
                     try:
                         li.decline_challenge(challenge.id)
@@ -150,7 +152,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                       config.get("abort_time", 20))
     board = setup_board(game)
     engine = engine_factory(board)
-    conversation = Conversation(game, engine, li, __version__, challenge_queue)
+    conversation = Conversation(game, engine, li, __version__, challenge_queue, config.get("chat_commands", {}))
 
     logger.info("+++ {}".format(game))
 
