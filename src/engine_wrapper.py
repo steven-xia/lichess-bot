@@ -9,6 +9,9 @@ import chess.uci
 import chess.xboard
 
 
+INFINITY = 100000
+
+
 @backoff.on_exception(backoff.expo, BaseException, max_time=120)
 def create_engine(config, board):
     cfg = config["engine"]
@@ -22,19 +25,22 @@ def create_engine(config, board):
 
     silence_stderr = cfg.get("silence_stderr", False)
     ponder = cfg.get("ponder", False)
+    resignation_conditions = cfg.get("resignation", {"threshold": 10 * INFINITY, "sustain_turns": 2})
 
     if engine_type == "xboard":
-        return XBoardEngine(board, commands, cfg.get("xboard_options", {}) or {}, silence_stderr)
+        return XBoardEngine(board, commands, cfg.get("xboard_options", {}) or {}, resignation_conditions,
+                            silence_stderr)
 
-    return UCIEngine(board, commands, cfg.get("uci_options", {}) or {}, silence_stderr, ponder)
+    return UCIEngine(board, commands, cfg.get("uci_options", {}) or {}, resignation_conditions, silence_stderr, ponder)
 
 
 class EngineWrapper:
 
-    def __init__(self, board, commands, options=None, silence_stderr=False, ponder_on=False):
+    def __init__(self, board, commands, options, resignation_conditions, silence_stderr=False, ponder_on=False):
         self.board = board
         self.commands = commands
         self.options = options
+        self.resignation_conditions = resignation_conditions
         self.silence_stderr = silence_stderr
         self.ponder_on = ponder_on
 
@@ -71,8 +77,7 @@ class EngineWrapper:
 
 class UCIEngine(EngineWrapper):
 
-    # todo: add resign support.
-    def __init__(self, board, commands, options, silence_stderr=False, ponder_on=False):
+    def __init__(self, board, commands, options, resignation_conditions, silence_stderr=False, ponder_on=False):
         commands = commands[0] if len(commands) == 1 else commands
         self.go_commands = options.get("go_commands", {})
 
@@ -81,6 +86,7 @@ class UCIEngine(EngineWrapper):
 
         if options:
             self.engine.setoption(options)
+        self.resignation_conditions = resignation_conditions
 
         self.engine.setoption({
             "UCI_Variant": type(board).uci_variant,
@@ -95,6 +101,8 @@ class UCIEngine(EngineWrapper):
         self.ponder_on = ponder_on
         self.ponder_command = False
         self.ponder_board = chess.Board()
+
+        self.past_scores = [0]
 
     def first_search(self, board, movetime):
         self.engine.position(board)
@@ -131,6 +139,13 @@ class UCIEngine(EngineWrapper):
                 movetime=cmds.get("movetime")
             )
 
+        try:
+            score = self.engine.info_handlers[0].info["score"][1]
+            score = score.cp if score.cp is not None else INFINITY * score.mate
+            self.past_scores.append(score)
+        except (KeyError, AttributeError):
+            self.past_scores = [0]  # reset the past scores so nothing will screw up if engine doesn't report score
+
         if self.ponder_on and ponder_move is not None:
             if board.turn == chess.WHITE:
                 wtime -= int(1000 * (time.time() - search_start_time))
@@ -142,7 +157,10 @@ class UCIEngine(EngineWrapper):
             self.ponder_board.push(ponder_move)
             self.ponder(self.ponder_board, wtime, btime, winc, binc)
 
-        return best_move
+        resign = max(self.past_scores[-self.resignation_conditions["sustain_turns"]:]) < \
+                 -self.resignation_conditions["threshold"]
+
+        return best_move, resign
 
     def ponder(self, board, wtime, btime, winc, binc):
         cmds = self.go_commands
@@ -172,7 +190,7 @@ class UCIEngine(EngineWrapper):
 
 class XBoardEngine(EngineWrapper):
 
-    def __init__(self, board, commands, options=None, silence_stderr=False, ponder_on=False):
+    def __init__(self, board, commands, options, resignation_conditions, silence_stderr=False, ponder_on=False):
         commands = commands[0] if len(commands) == 1 else commands
         self.engine = chess.xboard.popen_engine(commands, stderr=subprocess.DEVNULL if silence_stderr else None)
         self.engine.xboard()
@@ -184,6 +202,7 @@ class XBoardEngine(EngineWrapper):
 
         if options:
             self._handle_options(options)
+        self.resignation_conditions = resignation_conditions
 
         self.engine.setboard(board)
 
@@ -229,7 +248,7 @@ class XBoardEngine(EngineWrapper):
         else:
             self.engine.time(btime / 10)
             self.engine.otim(wtime / 10)
-        return self.engine.go()
+        return self.engine.go(), False  # todo: implement resignation for xboard engines.
 
     def print_stats(self):
         self.print_handler_stats(self.engine.post_handlers[0].post, ["depth", "nodes", "score"])

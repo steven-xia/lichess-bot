@@ -39,6 +39,9 @@ engine:                      # engine settings
 #      syzygy: "Syzygy Path"
   silence_stderr: false      # some engines (yes you, leela) are very noisy
   ponder: false              # whether or not to think on the opponent's time (only for UCI engines)
+#  resignation:
+#    threshold: 900           # threshold of centipawns to be losing by for resignation
+#    sustain_turns: 5         # number of turns to sustain the threshold centipawns for resignation
 
 abort_time: 20               # time to abort a game in seconds when there is no activity
 fake_think_time: false       # artificially slow down the bot to pretend like it's thinking
