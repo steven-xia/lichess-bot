@@ -71,6 +71,7 @@ class EngineWrapper:
 
 class UCIEngine(EngineWrapper):
 
+    # todo: add resign support.
     def __init__(self, board, commands, options, silence_stderr=False, ponder_on=False):
         commands = commands[0] if len(commands) == 1 else commands
         self.go_commands = options.get("go_commands", {})
