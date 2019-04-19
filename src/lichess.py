@@ -55,9 +55,9 @@ class Lichess:
 
     @backoff.on_exception(backoff.expo, (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError), max_time=20,
                           giveup=is_final)
-    def api_post(self, path, data=None):
+    def api_post(self, path, data=None, params=None):
         url = urljoin(self.baseUrl, path)
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, params=params)
         response.raise_for_status()
         return response.json()
 
@@ -67,8 +67,9 @@ class Lichess:
     def upgrade_to_bot_account(self):
         return self.api_post(ENDPOINTS["upgrade"])
 
-    def make_move(self, game_id, move):
-        return self.api_post(ENDPOINTS["move"].format(game_id, move))
+    def make_move(self, game_id, move, offering_draw=False):
+        return self.api_post(ENDPOINTS["move"].format(game_id, move),
+                             params={"offeringDraw": str(offering_draw).lower()})
 
     def chat(self, game_id, room, text):
         payload = {'room': room, 'text': text}

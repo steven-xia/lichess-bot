@@ -39,6 +39,10 @@ engine:                      # engine settings
 #      syzygy: "Syzygy Path"
   silence_stderr: false      # some engines (yes you, leela) are very noisy
   ponder: false              # whether or not to think on the opponent's time (only for UCI engines)
+#  offer_draw:
+#    threshold: 10            # threshold of centipawns to be away from 0 for draw offer
+#    sustain_turns: 10        # turns to sustain the threshold centipawns for draw offer
+#    minimum_turns: 60        # smallest amount of turns to start considering drawing
 #  resignation:
 #    threshold: 900           # threshold of centipawns to be losing by for resignation
 #    sustain_turns: 5         # number of turns to sustain the threshold centipawns for resignation
