@@ -110,6 +110,7 @@ class UCIEngine(EngineWrapper):
         self.ponder_board = chess.Board()
 
         self.past_scores = []
+        self.move_number = 1
 
     def first_search(self, board, movetime):
         self.engine.position(board)
@@ -117,6 +118,8 @@ class UCIEngine(EngineWrapper):
         return best_move
 
     def search(self, board, wtime, btime, winc, binc):
+        self.move_number += 1
+
         search_start_time = time.time()
         cmds = self.go_commands
 
@@ -152,6 +155,7 @@ class UCIEngine(EngineWrapper):
             self.past_scores.append(score)
         except (KeyError, AttributeError):
             self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
+        print(self.past_scores)
 
         if self.ponder_on and ponder_move is not None:
             if board.turn == chess.WHITE:
@@ -166,7 +170,8 @@ class UCIEngine(EngineWrapper):
 
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
         draw = max(draw_scores, key=abs) <= self.draw_conditions["threshold"] \
-            if len(self.past_scores) >= self.draw_conditions["sustain_turns"] + self.draw_conditions["minimum_turns"] \
+            if len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
+            self.move_number >= self.draw_conditions["minimum_turns"] \
             else False
 
         resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
@@ -225,6 +230,7 @@ class XBoardEngine(EngineWrapper):
         self.engine.post_handlers.append(post_handler)
 
         self.past_scores = []
+        self.move_number = 1
 
     def _handle_options(self, options):
         for option, value in options.items():
@@ -258,6 +264,8 @@ class XBoardEngine(EngineWrapper):
         return bestmove
 
     def search(self, board, wtime, btime, winc, binc):
+        self.move_number += 1
+
         self.engine.setboard(board)
         if board.turn == chess.WHITE:
             self.engine.time(wtime / 10)
@@ -276,7 +284,8 @@ class XBoardEngine(EngineWrapper):
 
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
         draw = max(draw_scores, key=abs) <= self.draw_conditions["threshold"] \
-            if len(self.past_scores) >= self.draw_conditions["sustain_turns"] + self.draw_conditions["minimum_turns"] \
+            if len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
+            self.move_number >= self.draw_conditions["minimum_turns"] \
             else False
 
         resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
