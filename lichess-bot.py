@@ -27,7 +27,7 @@ try:
 except ImportError:
     from http.client import BadStatusLine as RemoteDisconnected
 
-__version__ = "1.1.6"
+__version__ = "1.1.6 [unofficial]"
 
 terminated = False
 
@@ -198,6 +198,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                     if best_move is None:
                         best_move, draw, resign = engine.search(board, upd["wtime"], upd["btime"], upd["winc"], upd["binc"])
 
+                    # todo: stop engine if game is by resignation or draw accepted.
                     if resign:
                         li.resign(game.id)
                     else:
@@ -210,6 +211,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                     li.abort(game.id)
 
     except HTTPError as err:
+        # todo: more gracefully handle timeouts, I think that's to be done here... :P
         ongoing_game = tuple(filter(lambda g: g["gameID"] == game.id, li.get_ongoing_games()))
         if ongoing_game != ():
             logger.warning("Abandoning game due to HTTP " + response.status_code)
