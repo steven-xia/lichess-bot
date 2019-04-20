@@ -224,6 +224,8 @@ class XBoardEngine(EngineWrapper):
         post_handler = chess.xboard.PostHandler()
         self.engine.post_handlers.append(post_handler)
 
+        self.past_scores = []
+
     def _handle_options(self, options):
         for option, value in options.items():
             if option == "memory":
@@ -263,7 +265,25 @@ class XBoardEngine(EngineWrapper):
         else:
             self.engine.time(btime / 10)
             self.engine.otim(wtime / 10)
-        return self.engine.go(), False, False  # todo: implement resignation and draw for xboard engines.
+        best_move = self.engine.go()
+
+        try:
+            score = self.engine.post_handlers[0].post["score"][1]
+            score = score.cp if score.cp is not None else INFINITY * score.mate
+            self.past_scores.append(score)
+        except (KeyError, AttributeError):
+            self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
+
+        draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
+        draw = max(draw_scores, key=abs) <= self.draw_conditions["threshold"] \
+            if len(self.past_scores) >= self.draw_conditions["sustain_turns"] + self.draw_conditions["minimum_turns"] \
+            else False
+
+        resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
+        resign = max(resign_scores) <= -self.resignation_conditions["threshold"] \
+            if len(resign_scores) >= self.resignation_conditions["sustain_turns"] else False
+
+        return best_move, draw, resign
 
     def print_stats(self):
         self.print_handler_stats(self.engine.post_handlers[0].post, ["depth", "nodes", "score"])
