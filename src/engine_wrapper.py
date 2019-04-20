@@ -155,8 +155,6 @@ class UCIEngine(EngineWrapper):
             self.past_scores.append(score)
         except (KeyError, AttributeError):
             self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
-        print(self.past_scores)
-
         if self.ponder_on and ponder_move is not None:
             if board.turn == chess.WHITE:
                 wtime -= int(1000 * (time.time() - search_start_time))
