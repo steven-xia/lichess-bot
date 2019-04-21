@@ -28,6 +28,13 @@ ENDPOINTS = {
 }
 
 
+terminated = False
+
+
+def is_final(exception):
+    return (isinstance(exception, HTTPError) and exception.response.status_code < 500) or terminated
+
+
 # docs: https://lichess.org/api
 class Lichess:
     def __init__(self, token, url, version):
@@ -41,10 +48,6 @@ class Lichess:
         self.session.headers.update(self.header)
         self.set_user_agent("?")
 
-    def is_final(exception):
-        return isinstance(exception, HTTPError) and exception.response.status_code < 500
-
-    # todo: modify `backup` decorator to allow `KeyboardInterrupt` to stop program.
     @backoff.on_exception(backoff.expo, (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError), max_time=120,
                           giveup=is_final)
     def api_get(self, path):

@@ -36,13 +36,14 @@ def signal_handler(signal, frame):
     global terminated
     logger.debug("Received SIGINT. Terminating client.")
     terminated = True
+    lichess.terminated = True
 
 
 signal.signal(signal.SIGINT, signal_handler)
 
 
 def is_final(exception):
-    return isinstance(exception, HTTPError) and exception.response.status_code < 500
+    return (isinstance(exception, HTTPError) and exception.response.status_code < 500) or terminated
 
 
 def upgrade_account(li):
@@ -198,7 +199,6 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                     if best_move is None:
                         best_move, draw, resign = engine.search(board, upd["wtime"], upd["btime"], upd["winc"], upd["binc"])
 
-                    # todo: stop engine if game is by resignation or draw accepted.
                     if resign:
                         li.resign(game.id)
                     else:
@@ -211,7 +211,6 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                     li.abort(game.id)
 
     except HTTPError as err:
-        # todo: more gracefully handle timeouts, I think that's to be done here... :P
         ongoing_game = tuple(filter(lambda g: g["gameID"] == game.id, li.get_ongoing_games()))
         if ongoing_game != ():
             logger.warning("Abandoning game due to HTTP " + response.status_code)
