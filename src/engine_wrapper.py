@@ -11,6 +11,8 @@ import chess.xboard
 
 INFINITY = 100000
 
+MINIMUM_PONDER_TIME = 1000  # milliseconds: minimum amount of time remaining to start ponder
+
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=120)
 def create_engine(config, board):
@@ -155,16 +157,24 @@ class UCIEngine(EngineWrapper):
             self.past_scores.append(score)
         except (KeyError, AttributeError):
             self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
+
         if self.ponder_on and ponder_move is not None:
+
+            time_to_ponder = True
             if board.turn == chess.WHITE:
                 wtime -= int(1000 * (time.time() - search_start_time))
+                if wtime < MINIMUM_PONDER_TIME:
+                    time_to_ponder = False
             else:
                 btime -= int(1000 * (time.time() - search_start_time))
+                if btime < MINIMUM_PONDER_TIME:
+                    time_to_ponder = False
 
-            self.ponder_board = copy.deepcopy(board)
-            self.ponder_board.push(best_move)
-            self.ponder_board.push(ponder_move)
-            self.ponder(self.ponder_board, wtime, btime, winc, binc)
+            if time_to_ponder:
+                self.ponder_board = copy.deepcopy(board)
+                self.ponder_board.push(best_move)
+                self.ponder_board.push(ponder_move)
+                self.ponder(self.ponder_board, wtime, btime, winc, binc)
 
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
         draw = max(draw_scores, key=abs) <= self.draw_conditions["threshold"] \
