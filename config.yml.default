@@ -38,7 +38,8 @@ engine:                      # engine settings
 #      scorpio: "Scorpio Path"
 #      syzygy: "Syzygy Path"
   silence_stderr: false      # some engines (yes you, leela) are very noisy
-  ponder: false              # whether or not to think on the opponent's time (only for UCI engines)
+  ponder: false              # whether or not to think on the opponent's time (only for UCI engines).
+                             # This ponder implementation doesn't work well for Leela Chess Zero. See the "Leela" branch for ponder support with Leela.
 #  offer_draw:
 #    threshold: 10            # threshold of centipawns to be away from 0 for draw offer
 #    sustain_turns: 10        # turns to sustain the threshold centipawns for draw offer
