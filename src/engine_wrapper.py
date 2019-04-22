@@ -100,9 +100,9 @@ class EngineWrapper:
                 score = stat_value[1]
                 if score.cp is not None:
                     if score.cp > 0:
-                        score = "+{} cp".format(score.cp / 100)
+                        score = "+{}".format(score.cp / 100)
                     elif score.cp <= 0:
-                        score = "{} cp".format(str(score.cp / 100))
+                        score = "{}".format(str(score.cp / 100))
                 else:
                     if score.mate > 0:
                         score = "+M{}".format(score.mate)
