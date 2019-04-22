@@ -29,7 +29,7 @@ class Conversation:
         elif cmd == "howto":
             self.send_reply(line, "How to run your own bot: lichess.org/api#tag/Chess-Bot")
         elif cmd == "eval":
-            if line.room == "spectator":
+            if line.room == "spectator" or True:
                 stats = self.engine.get_stats()
                 self.send_reply(line, ", ".join(stats))
             else:
