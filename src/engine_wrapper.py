@@ -13,6 +13,20 @@ INFINITY = 100000
 
 MINIMUM_PONDER_TIME = 1000  # milliseconds: minimum amount of time remaining to start ponder
 
+METRIC_PREFIXES = {
+    10 ** 12: "T",
+    10 ** 9: "G",
+    10 ** 6: "M",
+    10 ** 3: "k",
+}
+
+LARGE_NUMBER_ABBREVIATIONS = {
+    10 ** 12: "T",
+    10 ** 9: "B",
+    10 ** 6: "M",
+    10 ** 3: "k",
+}
+
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=120)
 def create_engine(config, board):
@@ -70,15 +84,49 @@ class EngineWrapper:
         self.engine.quit()
 
     @staticmethod
+    def get_pretty_stat(stat_name, stat_value):
+        if stat_name == "nps":
+            for size, prefix in METRIC_PREFIXES.items():
+                if stat_value >= size:
+                    return "{} {}nps".format(stat_value // size, prefix)
+            return "{} nps".format(stat_value)
+        elif stat_name == "nodes":
+            for size, abbreviation in LARGE_NUMBER_ABBREVIATIONS.items():
+                if stat_value >= size:
+                    return "{}{} nodes".format(stat_value // size, abbreviation)
+            return "{} nodes".format(stat_value)
+        elif stat_name == "score":
+            try:
+                score = stat_value[1]
+                if score.cp is not None:
+                    if score.cp > 0:
+                        score = "+{} cp".format(score.cp / 100)
+                    elif score.cp <= 0:
+                        score = "{} cp".format(str(score.cp / 100))
+                else:
+                    if score.mate > 0:
+                        score = "+M{}".format(score.mate)
+                    elif score.mate < 0:
+                        score = "-M{}".format(abs(score.mate))
+                    else:
+                        score = "M0"
+            except (KeyError, AttributeError):
+                score = stat_value[1]
+            return "Score: {}".format(score)
+        elif stat_name == "depth":
+            return "Depth: {} ply".format(stat_value)
+        else:
+            return "{}: {}".format(stat_name, stat_value)
+
+    @staticmethod
     def print_handler_stats(info, stats):
         for stat in filter(lambda s: s in info, stats):
             print("    {}: {}".format(stat, info[stat]))
 
-    @staticmethod
-    def get_handler_stats(info, stats):
+    def get_handler_stats(self, info, stats):
         stats_str = []
         for stat in filter(lambda s: s in info, stats):
-            stats_str.append("{}: {}".format(stat, info[stat]))
+            stats_str.append(self.get_pretty_stat(stat, info[stat]))
         return stats_str
 
 
