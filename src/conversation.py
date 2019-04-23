@@ -31,7 +31,10 @@ class Conversation:
         elif cmd == "eval":
             if line.room == "spectator":
                 stats = self.engine.get_stats()
-                self.send_reply(line, ", ".join(stats) + ".")
+                if len(stats) == 0:
+                    self.send_reply(line, "No evaluation reported, probably in opening book.")
+                else:
+                    self.send_reply(line, ", ".join(stats) + ".")
             else:
                 self.send_reply(line, "I don't tell that to my opponent, sorry.")
         elif cmd == "queue":

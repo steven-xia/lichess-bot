@@ -126,7 +126,10 @@ class EngineWrapper:
     def get_handler_stats(self, info, stats):
         stats_str = []
         for stat in filter(lambda s: s in info, stats):
-            stats_str.append(self.get_pretty_stat(stat, info[stat]))
+            try:
+                stats_str.append(self.get_pretty_stat(stat, info[stat]))
+            except Exception as err:
+                pass
         return stats_str
 
 
@@ -225,7 +228,7 @@ class UCIEngine(EngineWrapper):
                 self.ponder(self.ponder_board, wtime, btime, winc, binc)
 
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
-        draw = max(draw_scores, key=abs) <= self.draw_conditions["threshold"] \
+        draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
             if len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
             self.move_number >= self.draw_conditions["minimum_turns"] \
             else False
@@ -339,7 +342,7 @@ class XBoardEngine(EngineWrapper):
             self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
 
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
-        draw = max(draw_scores, key=abs) <= self.draw_conditions["threshold"] \
+        draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
             if len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
             self.move_number >= self.draw_conditions["minimum_turns"] \
             else False
