@@ -7,7 +7,7 @@ import yaml
 def load_config(config_file):
     with open(config_file) as file_stream:
         try:
-            config = yaml.load(file_stream)
+            config = yaml.load(file_stream, Loader=yaml.FullLoader)
         except Exception as err:
             print("There appears to be a syntax problem with your config.yml")
             raise err
