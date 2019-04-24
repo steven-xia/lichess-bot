@@ -1,5 +1,6 @@
 token: "xxxxxxxxxxxxxxxx"    # lichess OAuth2 Token
 url: "https://lichess.org/"  # lichess base URL
+#username: "thibault"         # lichess username; not actually required ... 
 
 engine:                      # engine settings
   dir: "./engines/"          # dir containing engines, relative to this project
@@ -81,6 +82,7 @@ challenge:                   # incoming challenges
   ignore:
     - correspondence
 
+# Note all commands MUST be lowercase. Or else they will never work
 chat_commands:
   hardware: "The hardware is not provided."
   info: "There is no extra info provided."

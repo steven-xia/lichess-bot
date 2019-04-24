@@ -1,6 +1,11 @@
-config.yml
 __pycache__
+\.idea/
+
+config.yml
+
 /engines/*
 !/engines/README.md
 
-\.idea/
+leelaz_opencl_tuning
+lichess-bot_JeffIO.bat
+lichess-bot_TrashBot.bat
