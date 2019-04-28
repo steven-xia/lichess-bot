@@ -1,6 +1,5 @@
 token: "xxxxxxxxxxxxxxxx"    # lichess OAuth2 Token
 url: "https://lichess.org/"  # lichess base URL
-#username: "thibault"         # lichess username; not actually required ... 
 
 engine:                      # engine settings
   dir: "./engines/"          # dir containing engines, relative to this project

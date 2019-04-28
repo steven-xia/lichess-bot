@@ -1,19 +1,16 @@
-RANDOM_USERNAME = "       #     )*&^%$#$@$@#$@$#*****"
-
-
 class Conversation:
     command_prefix = "!"
     username_prefix = "@"
     spectator_prefix = "spectator<"
 
-    def __init__(self, game, engine, xhr, version, challenge_queue, commands, username=None):
+    def __init__(self, game, engine, xhr, version, challenge_queue, commands, username):
         self.game = game
         self.engine = engine
         self.xhr = xhr
         self.version = version
         self.challengers = challenge_queue
         self._commands = commands
-        self.username = username if username is not None else RANDOM_USERNAME
+        self.username = username
 
         self._commands_string = ", {}".format(Conversation.command_prefix).join(commands.keys())
         if self._commands_string != "":

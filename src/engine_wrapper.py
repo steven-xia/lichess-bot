@@ -30,6 +30,8 @@ LARGE_NUMBER_ABBREVIATIONS = {
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=120)
 def create_engine(config, board):
+    # todo: add support for time control dependant hash sizes
+
     cfg = config["engine"]
     engine_path = os.path.join(cfg["dir"], cfg["name"])
     engine_type = cfg.get("protocol")

@@ -159,7 +159,8 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                       config.get("abort_time", 20))
     board = setup_board(game)
     engine = engine_factory(board)
-    conversation = Conversation(game, engine, li, __version__, challenge_queue, config.get("chat_commands", {}), config.get("username", None))
+    conversation = Conversation(game, engine, li, __version__, challenge_queue, config.get("chat_commands", {}),
+                                user_profile["username"])
 
     logger.info("+++ {}".format(game))
 
