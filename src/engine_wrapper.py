@@ -28,8 +28,37 @@ LARGE_NUMBER_ABBREVIATIONS = {
 }
 
 
+GAME_SPEEDS = ("ultraBullet", "bullet", "blitz", "rapid", "classical")
+
+
+def get_config(config, speed):
+    speed_index = GAME_SPEEDS.index(speed)
+    for d in range(len(GAME_SPEEDS)):
+        close_speeds = filter(lambda s: abs(GAME_SPEEDS.index(s) - speed_index) == d, GAME_SPEEDS)
+        for close_speed in close_speeds:
+            try:
+                return config[close_speed]
+            except KeyError:
+                pass
+    return None
+
+
+def parse_configs(options, speed):
+    for name, value in options.items():
+        if name in ("go_commands", "egtpath") or type(value) == int:
+            continue
+        if type(value) == dict:
+            new_value = get_config(value, speed)
+            if new_value is None:
+                del options[name]
+            else:
+                options[name] = new_value
+                print("Setting {} to {}.".format(name, new_value))
+    return options
+
+
 @backoff.on_exception(backoff.expo, BaseException, max_time=120)
-def create_engine(config, board):
+def create_engine(config, board, game_speed):
     # todo: add support for time control dependant hash sizes
 
     cfg = config["engine"]
@@ -50,10 +79,11 @@ def create_engine(config, board):
     }
 
     if engine_type == "xboard":
-        return XBoardEngine(board, commands, cfg.get("xboard_options", {}) or {}, game_end_conditions,
-                            silence_stderr)
-
-    return UCIEngine(board, commands, cfg.get("uci_options", {}) or {}, game_end_conditions, silence_stderr, ponder)
+        options = parse_configs(cfg.get("xboard_options", {}), game_speed)
+        return XBoardEngine(board, commands, options, game_end_conditions, silence_stderr)
+    else:
+        options = parse_configs(cfg.get("uci_options", {}), game_speed)
+        return UCIEngine(board, commands, options, game_end_conditions, silence_stderr, ponder)
 
 
 class EngineWrapper:

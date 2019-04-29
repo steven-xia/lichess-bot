@@ -158,7 +158,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
     game = model.Game(json.loads(next(lines).decode('utf-8')), user_profile["username"], li.baseUrl,
                       config.get("abort_time", 20))
     board = setup_board(game)
-    engine = engine_factory(board)
+    engine = engine_factory(board, game.speed)
     conversation = Conversation(game, engine, li, __version__, challenge_queue, config.get("chat_commands", {}),
                                 user_profile["username"])
 
@@ -198,7 +198,8 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                     if polyglot_cfg.get("enabled") and len(moves) <= polyglot_cfg.get("max_depth", 8) * 2 - 1:
                         best_move = get_book_move(board, book_cfg)
                     if best_move is None:
-                        best_move, draw, resign = engine.search(board, upd["wtime"], upd["btime"], upd["winc"], upd["binc"])
+                        best_move, draw, resign = engine.search(board, upd["wtime"], upd["btime"], upd["winc"],
+                                                                upd["binc"])
 
                     if resign:
                         li.resign(game.id)
@@ -211,7 +212,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                     logger.info("    Aborting {} by lack of activity".format(game.url()))
                     li.abort(game.id)
 
-    except HTTPError as err:
+    except HTTPError:
         ongoing_game = tuple(filter(lambda g: g["gameID"] == game.id, li.get_ongoing_games()))
         if ongoing_game != ():
             logger.warning("Abandoning game due to HTTP " + response.status_code)
@@ -284,8 +285,8 @@ def setup_board(game):
     elif game.variant_name == "From Position":
         board = chess.Board(game.initial_fen)
     else:
-        VariantBoard = find_variant(game.variant_name)
-        board = VariantBoard()
+        board = find_variant(game.variant_name)()
+
     moves = game.state["moves"].split()
     for move in moves:
         board = update_board(board, move)

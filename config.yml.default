@@ -24,7 +24,12 @@ engine:                      # engine settings
   uci_options:               # arbitrary UCI options passed to the engine
     Move Overhead: 100       # increase if your bot flags games too often
     Threads: 2               # max CPU threads the engine can use
-    Hash: 256                # max memory (in megabytes) the engine can allocate
+    Hash:                    # max memory (in megabytes) the engine can allocate
+      ultraBullet: 16
+      bullet: 64
+      blitz: 256
+      rapid: 512
+      classical: 512
 #    go_commands:             # additional options to pass to the UCI go command
 #      nodes: 1               # Search so many nodes only.
 #      depth: 5               # Search depth ply only.
