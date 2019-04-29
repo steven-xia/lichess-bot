@@ -31,9 +31,6 @@ class Conversation:
 
     def command(self, line, game, cmd):
         if cmd == "commands" or cmd == "help":
-            commands = ["!name", "!howto", "!eval", "!queue"]
-            if self.username != RANDOM_USERNAME:
-                commands.append("!chat")
             self.send_reply(line, "Supported commands: !name, !howto, !eval, !queue, !chat{}.".format(
                 self._commands_string
             ))
@@ -59,7 +56,7 @@ class Conversation:
                 self.send_reply(line, "Challenge queue: {}".format(challengers))
             else:
                 self.send_reply(line, "No challenges queued.")
-        elif cmd == "chat" and self.username != RANDOM_USERNAME:
+        elif cmd == "chat":
             self.send_reply(line, "You can chat with me (if I'm watching) by prepending messages with \"@{} \".".format(
                 self.username
             ))
