@@ -7,8 +7,8 @@ engine:                      # engine settings
   protocol: "uci"            # "uci" or "xboard"
   polyglot:
     enabled: false           # activate polyglot book
-    book:
-      standard: "engines/book.bin" # book file path of standard chess
+#    book:
+#      standard: "engines/book.bin"  # book file path of standard chess
 #      atomic: "atomic book path"
 #      giveaway: "antichess book path"
 #      crazyhouse: "crazyhouse book path"
@@ -41,7 +41,7 @@ engine:                      # engine settings
   ponder: false              # whether or not to think on the opponent's time (only for UCI engines).
                              # This ponder implementation doesn't work well for Leela Chess Zero. See the "Leela" branch for ponder support with Leela.
 #  offer_draw:
-#    threshold: 10            # threshold of centipawns to be away from 0 for draw offer
+#    threshold: 5             # threshold of centipawns to be away from 0 for draw offer
 #    sustain_turns: 10        # turns to sustain the threshold centipawns for draw offer
 #    minimum_turns: 60        # smallest amount of turns to start considering drawing
 #  resignation:
@@ -54,7 +54,7 @@ fake_think_time: false       # artificially slow down the bot to pretend like it
 challenge:                   # incoming challenges
   concurrency: 1             # number of games to play simultaneously
   sort_by: "best"            # possible values: "best", "first"
-  accept_bot: false          # accepts challenges coming from other bots
+  accept_bot: true           # accepts challenges coming from other bots
   max_increment: 180         # maximum amount of increment to accept a challenge. the max is 180. set to 0 for no increment
   min_increment: 0           # minimum amount of increment to accept a challenge
   variants:                  # chess variants to accept (http://lichess.org/variant)
@@ -82,6 +82,6 @@ challenge:                   # incoming challenges
     - correspondence
 
 # Note all commands MUST be lowercase. Or else they will never work
-chat_commands:
-  hardware: "The hardware is not provided."
-  info: "There is no extra info provided."
+#chat_commands:
+#  hardware: "The hardware is not provided."
+#  info: "There is no extra info provided."
