@@ -53,7 +53,6 @@ def parse_configs(options, speed):
                 del options[name]
             else:
                 options[name] = new_value
-                print("Setting {} to {}.".format(name, new_value))
     return options
 
 
