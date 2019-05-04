@@ -45,7 +45,7 @@ class Conversation:
             if line.room == "spectator" or line.username.lower() == self.username.lower():
                 stats = self.engine.get_stats()
                 if len(stats) == 0:
-                    self.send_reply(line, "No evaluation reported, probably in opening book.")
+                    self.send_reply(line, "No evaluation reported.")
                 else:
                     self.send_reply(line, ", ".join(stats) + ".")
             else:
