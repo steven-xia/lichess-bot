@@ -9,7 +9,7 @@ import chess.uci
 import chess.xboard
 
 
-INFINITY = 100000
+MATE_SCORE = 100000
 
 MINIMUM_PONDER_TIME = 1000  # milliseconds: minimum amount of time remaining to start ponder
 
@@ -72,7 +72,7 @@ def create_engine(config, board, game_speed):
 
     game_end_conditions = {
         "draw": cfg.get("offer_draw", {"threshold": -1, "sustain_turns": 9999, "minimum_turns": 0}),
-        "resignation": cfg.get("resignation", {"threshold": 10 * INFINITY, "sustain_turns": 1}),
+        "resignation": cfg.get("resignation", {"threshold": 9999 * MATE_SCORE, "sustain_turns": 1}),
     }
 
     if engine_type == "xboard":
@@ -230,7 +230,7 @@ class UCIEngine(EngineWrapper):
 
         try:
             score = self.engine.info_handlers[0].info["score"][1]
-            score = score.cp if score.cp is not None else INFINITY * score.mate
+            score = score.cp if score.cp is not None else MATE_SCORE * score.mate
             self.past_scores.append(score)
         except (KeyError, AttributeError):
             self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
@@ -363,7 +363,7 @@ class XBoardEngine(EngineWrapper):
 
         try:
             score = self.engine.post_handlers[0].post["score"][1]
-            score = score.cp if score.cp is not None else INFINITY * score.mate
+            score = score.cp if score.cp is not None else MATE_SCORE * score.mate
             self.past_scores.append(score)
         except (KeyError, AttributeError):
             self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
