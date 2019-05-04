@@ -256,7 +256,7 @@ class UCIEngine(EngineWrapper):
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
         draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
             if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
-            2 * board.halfmove_clock >= self.draw_conditions["sustain_turns"] and \
+            board.halfmove_clock / 2 >= self.draw_conditions["sustain_turns"] and \
             len(self.past_scores) >= self.draw_conditions["sustain_turns"] \
             else False
 
@@ -370,8 +370,9 @@ class XBoardEngine(EngineWrapper):
 
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
         draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
-            if len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
-            self.move_number >= self.draw_conditions["minimum_turns"] \
+            if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
+            board.halfmove_clock / 2 >= self.draw_conditions["sustain_turns"] and \
+            len(self.past_scores) >= self.draw_conditions["sustain_turns"] \
             else False
 
         resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
