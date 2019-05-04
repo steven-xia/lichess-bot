@@ -141,6 +141,7 @@ def enable_color_logging(debug_lvl=logging.DEBUG):
     ch.setLevel(debug_lvl)
 
     # FORMAT from https://github.com/xolox/python-coloredlogs
+    # noinspection PyPep8Naming
     FORMAT = '%(asctime)s %(name)s[%(process)d] \033[1m%(levelname)s\033[0m %(message)s'
     formatter = logging.Formatter(FORMAT, "%Y-%m-%d %H:%M:%S")
 
