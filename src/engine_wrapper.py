@@ -58,8 +58,6 @@ def parse_configs(options, speed):
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=120)
 def create_engine(config, board, game_speed):
-    # todo: add support for time control dependant hash sizes
-
     cfg = config["engine"]
     engine_path = os.path.join(cfg["dir"], cfg["name"])
     engine_type = cfg.get("protocol")
@@ -194,7 +192,6 @@ class UCIEngine(EngineWrapper):
         self.ponder_board = chess.Board()
 
         self.past_scores = []
-        self.move_number = 1
 
     def first_search(self, board, movetime):
         self.engine.position(board)
@@ -202,8 +199,6 @@ class UCIEngine(EngineWrapper):
         return best_move
 
     def search(self, board, wtime, btime, winc, binc):
-        self.move_number += 1
-
         search_start_time = time.time()
         cmds = self.go_commands
 
@@ -260,8 +255,9 @@ class UCIEngine(EngineWrapper):
 
         draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
         draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
-            if len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
-            self.move_number >= self.draw_conditions["minimum_turns"] \
+            if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
+            2 * board.halfmove_clock >= self.draw_conditions["sustain_turns"] and \
+            len(self.past_scores) >= self.draw_conditions["sustain_turns"] \
             else False
 
         resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
