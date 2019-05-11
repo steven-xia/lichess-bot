@@ -3,6 +3,7 @@ import json
 import logging
 import multiprocessing
 import signal
+import threading
 import time
 import traceback
 from functools import partial
@@ -193,18 +194,23 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                         time.sleep(sleep)
 
                     best_move = None
-                    draw = False
-                    resign = False
                     if polyglot_cfg.get("enabled") and len(moves) <= polyglot_cfg.get("max_depth", 8) * 2 - 1:
                         best_move = get_book_move(board, book_cfg)
                     if best_move is None:
-                        best_move, draw, resign = engine.search(board, upd["wtime"], upd["btime"], upd["winc"],
-                                                                upd["binc"])
+                        def move_function():
+                            move, draw_offer, resign = engine.search(board, upd["wtime"], upd["btime"], upd["winc"],
+                                                                     upd["binc"])
+                            if resign:
+                                li.resign(game.id)
+                            else:
+                                li.make_move(game.id, move, offering_draw=draw_offer)
+                            game.abort_in(config.get("abort_time", 20))
 
-                    if resign:
-                        li.resign(game.id)
-                    else:
-                        li.make_move(game.id, best_move, offering_draw=draw)
+                        move_thread = threading.Thread(target=move_function)
+                        move_thread.start()
+                        continue
+
+                    li.make_move(game.id, best_move)
                     game.abort_in(config.get("abort_time", 20))
 
             elif u_type == "ping":
