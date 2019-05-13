@@ -117,12 +117,18 @@ class EngineWrapper:
         if stat_name == "nps":
             for size, prefix in METRIC_PREFIXES.items():
                 if stat_value >= size:
-                    return "{} {}nps".format(stat_value // size, prefix)
+                    formatted_value = round(stat_value / size, 1)
+                    if round(formatted_value) >= 10:
+                        formatted_value = round(formatted_value)
+                    return "{} {}nps".format(formatted_value, prefix)
             return "{} nps".format(stat_value)
         elif stat_name == "nodes":
             for size, abbreviation in LARGE_NUMBER_ABBREVIATIONS.items():
                 if stat_value >= size:
-                    return "{}{} nodes".format(stat_value // size, abbreviation)
+                    formatted_value = round(stat_value / size, 1)
+                    if round(formatted_value) >= 10:
+                        formatted_value = round(formatted_value)
+                    return "{}{} nodes".format(formatted_value, abbreviation)
             return "{} nodes".format(stat_value)
         elif stat_name == "score":
             try:
