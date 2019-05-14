@@ -322,7 +322,6 @@ class XBoardEngine(EngineWrapper):
         self.engine.post_handlers.append(post_handler)
 
         self.past_scores = []
-        self.move_number = 1
 
     def _handle_options(self, options):
         for option, value in options.items():
@@ -356,8 +355,6 @@ class XBoardEngine(EngineWrapper):
         return bestmove
 
     def search(self, board, wtime, btime, winc, binc):
-        self.move_number += 1
-
         self.engine.setboard(board)
         if board.turn == chess.WHITE:
             self.engine.time(wtime / 10)
