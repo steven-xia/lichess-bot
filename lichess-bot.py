@@ -200,16 +200,19 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                         def move_function():
                             return_value = engine.search(board, upd["wtime"], upd["btime"], upd["winc"],
                                                          upd["binc"])
-
                             if engine.is_game_over:
                                 return
 
                             # do this after making sure game not over
                             move, draw_offer, resign = return_value
-                            if resign:
-                                li.resign(game.id)
-                            else:
-                                li.make_move(game.id, move, offering_draw=draw_offer)
+                            try:
+                                if resign:
+                                    li.resign(game.id)
+                                else:
+                                    li.make_move(game.id, move, offering_draw=draw_offer)
+                            except HTTPError:
+                                pass
+
                             game.abort_in(config.get("abort_time", 20))
 
                         move_thread = threading.Thread(target=move_function)

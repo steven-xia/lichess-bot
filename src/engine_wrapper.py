@@ -213,7 +213,8 @@ class UCIEngine(EngineWrapper):
             if self.ponder_board.fen() == board.fen():
                 self.engine.ponderhit()
                 while not self.ponder_command.done():
-                    pass
+                    if self.is_game_over:
+                        return
                 best_move, ponder_move = self.ponder_command.result()
             else:
                 self.engine.stop()
@@ -222,15 +223,21 @@ class UCIEngine(EngineWrapper):
 
         if best_move is None:
             self.engine.position(board)
-            best_move, ponder_move = self.engine.go(
+            callback = self.engine.go(
                 wtime=wtime,
                 btime=btime,
                 winc=winc,
                 binc=binc,
                 depth=cmds.get("depth"),
                 nodes=cmds.get("nodes"),
-                movetime=cmds.get("movetime")
+                movetime=cmds.get("movetime"),
+                async_callback=True
             )
+
+            while not callback.done():
+                if self.is_game_over:
+                    return
+            best_move, ponder_move = callback.result()
 
         try:
             score = self.engine.info_handlers[0].info["score"][1]
