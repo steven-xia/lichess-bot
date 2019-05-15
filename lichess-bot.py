@@ -198,8 +198,14 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                         best_move = get_book_move(board, book_cfg)
                     if best_move is None:
                         def move_function():
-                            move, draw_offer, resign = engine.search(board, upd["wtime"], upd["btime"], upd["winc"],
-                                                                     upd["binc"])
+                            return_value = engine.search(board, upd["wtime"], upd["btime"], upd["winc"],
+                                                         upd["binc"])
+
+                            if engine.is_game_over:
+                                return
+
+                            # do this after making sure game not over
+                            move, draw_offer, resign = return_value
                             if resign:
                                 li.resign(game.id)
                             else:
@@ -229,6 +235,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
 
     finally:
         logger.info("--- {} Game over".format(game.url()))
+        engine.is_game_over = True
         engine.quit()
         # This can raise queue.NoFull, but that should only happen if we're not processing
         # events fast enough and in this case I believe the exception should be raised
