@@ -210,7 +210,7 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
                                     li.resign(game.id)
                                 else:
                                     li.make_move(game.id, move, offering_draw=draw_offer)
-                            except HTTPError:
+                            except (HTTPError, ValueError):  # ValueError if engine closed.
                                 pass
 
                             game.abort_in(config.get("abort_time", 20))
