@@ -20,7 +20,7 @@ def load_config(config_file):
             ["challenge", dict, "Section `challenge` must be a dictionary with indented keys followed by colons.."]]
         for section in sections:
             if section[0] not in config:
-                raise Exception(f"Your config.yml does not have required section `{section[0]}`.")
+                raise Exception("Your config.yml does not have required section `{}`.".format(section[0]))
             elif not isinstance(config[section[0]], section[1]):
                 raise Exception(section[2])
 

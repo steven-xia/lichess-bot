@@ -94,6 +94,9 @@ class EngineWrapper:
         self.silence_stderr = silence_stderr
         self.ponder_on = ponder_on
 
+        self.past_scores = []
+        self.is_game_over = False
+
     def set_time_control(self, game):
         pass
 
@@ -171,6 +174,7 @@ class EngineWrapper:
 class UCIEngine(EngineWrapper):
 
     def __init__(self, board, commands, options, game_end_conditions, silence_stderr=False, ponder_on=False):
+        super().__init__(board, commands, options, game_end_conditions, silence_stderr, ponder_on)
         commands = commands[0] if len(commands) == 1 else commands
         self.go_commands = options.get("go_commands", {})
 
@@ -179,9 +183,6 @@ class UCIEngine(EngineWrapper):
 
         if options:
             self.engine.setoption(options)
-
-        self.draw_conditions = game_end_conditions["draw"]
-        self.resignation_conditions = game_end_conditions["resignation"]
 
         self.engine.setoption({
             "UCI_Variant": type(board).uci_variant,
@@ -193,11 +194,8 @@ class UCIEngine(EngineWrapper):
         info_handler = chess.uci.InfoHandler()
         self.engine.info_handlers.append(info_handler)
 
-        self.ponder_on = ponder_on
         self.ponder_command = False
         self.ponder_board = chess.Board()
-
-        self.past_scores = []
 
     def first_search(self, board, movetime):
         self.engine.position(board)
@@ -215,7 +213,8 @@ class UCIEngine(EngineWrapper):
             if self.ponder_board.fen() == board.fen():
                 self.engine.ponderhit()
                 while not self.ponder_command.done():
-                    pass
+                    if self.is_game_over:
+                        return
                 best_move, ponder_move = self.ponder_command.result()
             else:
                 self.engine.stop()
@@ -224,15 +223,21 @@ class UCIEngine(EngineWrapper):
 
         if best_move is None:
             self.engine.position(board)
-            best_move, ponder_move = self.engine.go(
+            callback = self.engine.go(
                 wtime=wtime,
                 btime=btime,
                 winc=winc,
                 binc=binc,
                 depth=cmds.get("depth"),
                 nodes=cmds.get("nodes"),
-                movetime=cmds.get("movetime")
+                movetime=cmds.get("movetime"),
+                async_callback=True
             )
+
+            while not callback.done():
+                if self.is_game_over:
+                    return
+            best_move, ponder_move = callback.result()
 
         try:
             score = self.engine.info_handlers[0].info["score"][1]
@@ -301,6 +306,7 @@ class UCIEngine(EngineWrapper):
 class XBoardEngine(EngineWrapper):
 
     def __init__(self, board, commands, options, game_end_conditions, silence_stderr=False, ponder_on=False):
+        super().__init__(board, commands, options, game_end_conditions, silence_stderr, ponder_on)
         commands = commands[0] if len(commands) == 1 else commands
         self.engine = chess.xboard.popen_engine(commands, stderr=subprocess.DEVNULL if silence_stderr else None)
         self.engine.xboard()
@@ -313,16 +319,10 @@ class XBoardEngine(EngineWrapper):
         if options:
             self._handle_options(options)
 
-        self.draw_conditions = game_end_conditions["draw"]
-        self.resignation_conditions = game_end_conditions["resignation"]
-
         self.engine.setboard(board)
 
         post_handler = chess.xboard.PostHandler()
         self.engine.post_handlers.append(post_handler)
-
-        self.past_scores = []
-        self.move_number = 1
 
     def _handle_options(self, options):
         for option, value in options.items():
@@ -356,8 +356,6 @@ class XBoardEngine(EngineWrapper):
         return bestmove
 
     def search(self, board, wtime, btime, winc, binc):
-        self.move_number += 1
-
         self.engine.setboard(board)
         if board.turn == chess.WHITE:
             self.engine.time(wtime / 10)
