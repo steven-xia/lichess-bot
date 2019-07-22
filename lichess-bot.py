@@ -335,6 +335,8 @@ def intro():
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
     parser = argparse.ArgumentParser(description='Play on Lichess with a bot')
     parser.add_argument('-u', action='store_true', help='Add this flag to upgrade your account to a bot account.')
     parser.add_argument('-v', action='store_true', help='Verbose output. Changes log level from INFO to DEBUG.')
