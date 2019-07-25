@@ -6,6 +6,5 @@ config.yml
 /engines/*
 !/engines/README.md
 
-leelaz_opencl_tuning
+config_JeffIO.yml
 lichess-bot_JeffIO.bat
-lichess-bot_TrashBot.bat
