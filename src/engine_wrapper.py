@@ -165,7 +165,10 @@ class EngineWrapper:
         stats_str = []
         for stat in filter(lambda s: s in info, stats):
             try:
-                stats_str.append(self.get_pretty_stat(stat, info[stat]))
+                if stat == "depth" and "seldepth" in info and info["seldepth"] > info["depth"]:
+                    stats_str.append(self.get_pretty_stat(stat, "{}/{}".format(info["depth"], info["seldepth"])))
+                else:
+                    stats_str.append(self.get_pretty_stat(stat, info[stat]))
             except Exception as err:
                 pass
         return stats_str
