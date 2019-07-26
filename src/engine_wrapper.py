@@ -11,7 +11,14 @@ import chess.xboard
 
 MATE_SCORE = 100000
 
-MINIMUM_PONDER_TIME = 1000  # milliseconds: minimum amount of time remaining to start ponder
+# minimum amount of time remaining to start ponder (milliseconds)
+MINIMUM_PONDER_TIME = 1000
+
+# time to subtract from the time given to the engine. this helps with bad
+# connections in which Lichess compensates the time but you still need the
+# engine to make the move faster. also useful when you have an unstable
+# connection that lags every once in a while.
+LEEWAY_TIME = 0
 
 METRIC_PREFIXES = {
     10 ** 12: "T",
@@ -217,6 +224,11 @@ class UCIEngine(EngineWrapper):
         search_start_time = time.time()
         cmds = self.go_commands
 
+        if board.turn == chess.WHITE:
+            wtime = max(0, wtime - LEEWAY_TIME)
+        else:
+            btime = max(0, btime - LEEWAY_TIME)
+
         best_move = None
         ponder_move = None
 
@@ -371,9 +383,11 @@ class XBoardEngine(EngineWrapper):
     def search(self, board, wtime, btime, winc, binc):
         self.engine.setboard(board)
         if board.turn == chess.WHITE:
+            wtime = max(0, wtime - LEEWAY_TIME)
             self.engine.time(wtime / 10)
             self.engine.otim(btime / 10)
         else:
+            btime = max(0, btime - LEEWAY_TIME)
             self.engine.time(btime / 10)
             self.engine.otim(wtime / 10)
         best_move = self.engine.go()
