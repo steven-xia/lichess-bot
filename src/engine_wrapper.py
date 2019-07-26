@@ -153,6 +153,14 @@ class EngineWrapper:
             return "Score: {}".format(score)
         elif stat_name == "depth":
             return "Depth: {} ply".format(stat_value)
+        elif stat_name == "tbhits":
+            for size, abbreviation in LARGE_NUMBER_ABBREVIATIONS.items():
+                if stat_value >= size:
+                    formatted_value = round(stat_value / size, 1)
+                    if round(formatted_value) >= 10:
+                        formatted_value = round(formatted_value)
+                    return "{}{} tb hits".format(formatted_value, abbreviation)
+            return "{} tb hits".format(stat_value)
         else:
             return "{}: {}".format(stat_name, stat_value)
 
@@ -300,10 +308,12 @@ class UCIEngine(EngineWrapper):
         self.engine.stop()
 
     def print_stats(self):
-        self.print_handler_stats(self.engine.info_handlers[0].info, ["string", "depth", "nps", "nodes", "score"])
+        self.print_handler_stats(self.engine.info_handlers[0].info,
+                                 ["string", "depth", "nps", "nodes", "tbhits", "score"])
 
     def get_stats(self):
-        return self.get_handler_stats(self.engine.info_handlers[0].info, ["depth", "nps", "nodes", "score"])
+        return self.get_handler_stats(self.engine.info_handlers[0].info,
+                                      ["depth", "nps", "nodes", "tbhits", "score"])
 
 
 class XBoardEngine(EngineWrapper):
