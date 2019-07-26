@@ -2,6 +2,7 @@ class Conversation:
     command_prefix = "!"
     username_prefix = "@"
     spectator_prefix = "spectator<"
+    built_in_commands = ["name", "howto", "eval", "queue", "chat"]
 
     def __init__(self, game, engine, xhr, version, challenge_queue, commands, username):
         self.game = game
@@ -12,9 +13,8 @@ class Conversation:
         self._commands = commands
         self.username = username
 
-        self._commands_string = ", {}".format(Conversation.command_prefix).join(commands.keys())
-        if self._commands_string != "":
-            self._commands_string = ", {}{}".format(Conversation.command_prefix, self._commands_string)
+        self._commands_string = Conversation.command_prefix + ", {}".format(Conversation.command_prefix).join(
+            frozenset(Conversation.built_in_commands + list(commands.keys())))
 
         self._username_string = "{}{} ".format(Conversation.username_prefix, username).lower()
 
@@ -31,14 +31,21 @@ class Conversation:
 
     def command(self, line, game, cmd):
         if cmd == "commands" or cmd == "help":
-            self.send_reply(line, "Supported commands: !name, !howto, !eval, !queue, !chat{}.".format(
-                self._commands_string
+            self.send_reply(line, "Supported commands: {}.".format(self._commands_string))
+
+        try:
+            self.send_reply(line, self._commands[cmd].format(
+                engine=self.engine.name,
+                version=self.version
             ))
+            return
+        except KeyError:
+            pass
+
         if cmd == "wait" and game.is_abortable():
             game.abort_in(60)
             self.send_reply(line, "Waiting 60 seconds...")
         elif cmd == "name":
-            # self.send_reply(line, "I am a chess engine (lichess-bot v{}).".format(self.version))
             self.send_reply(line, "{} (lichess-bot v{}).".format(self.engine.name(), self.version))
         elif cmd == "howto":
             self.send_reply(line, "How to run your own bot: lichess.org/api#tag/Chess-Bot")
@@ -61,11 +68,6 @@ class Conversation:
             self.send_reply(line, "You can chat with me (if I'm watching) by prepending messages with \"@{} \".".format(
                 self.username
             ))
-        else:
-            try:
-                self.send_reply(line, self._commands[cmd])
-            except KeyError:
-                pass
 
     def forward_to_private(self, line, text):
         line.room = "player"
