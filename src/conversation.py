@@ -13,6 +13,7 @@ class Conversation:
         self._commands = commands
         self.username = username
 
+        self._commands = {k.lower(): v for k, v in self._commands.items()}
         self._commands_string = Conversation.command_prefix + ", {}".format(Conversation.command_prefix).join(
             frozenset(Conversation.built_in_commands + list(commands.keys())))
 

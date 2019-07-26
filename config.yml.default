@@ -86,7 +86,6 @@ challenge:                   # incoming challenges
   ignore:
     - correspondence
 
-# Note all commands MUST be lowercase. Or else they will never work
 # Use variables by putting "{variable_name}" in your reply string.
 # Available variables: engine, version
 #chat_commands:
