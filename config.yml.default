@@ -87,6 +87,9 @@ challenge:                   # incoming challenges
     - correspondence
 
 # Note all commands MUST be lowercase. Or else they will never work
+# Use variables by putting "{variable_name}" in your reply string.
+# Available variables: engine, version
 #chat_commands:
+#  name: "My engine is private. (lichess-bot v{version})"  # yes, you can override built-in chat commands
 #  hardware: "The hardware is not provided."
 #  info: "There is no extra info provided."
