@@ -9,7 +9,7 @@ import chess.uci
 import chess.xboard
 
 
-MATE_SCORE = 100000
+MATE_SCORE = 1 << 31
 
 # minimum amount of time remaining to start ponder (milliseconds)
 MINIMUM_PONDER_TIME = 1000
