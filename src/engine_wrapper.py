@@ -11,9 +11,6 @@ import chess.xboard
 
 MATE_SCORE = 1 << 31
 
-# minimum amount of time remaining to start ponder (milliseconds)
-MINIMUM_PONDER_TIME = 1000
-
 # time to subtract from the time given to the engine. this helps with bad
 # connections in which Lichess compensates the time but you still need the
 # engine to make the move faster. also useful when you have an unstable
@@ -275,11 +272,11 @@ class UCIEngine(EngineWrapper):
             time_to_ponder = True
             if board.turn == chess.WHITE:
                 wtime -= int(1000 * (time.time() - search_start_time))
-                if wtime < MINIMUM_PONDER_TIME:
+                if wtime < self.move_overhead:
                     time_to_ponder = False
             else:
                 btime -= int(1000 * (time.time() - search_start_time))
-                if btime < MINIMUM_PONDER_TIME:
+                if btime < self.move_overhead:
                     time_to_ponder = False
 
             if time_to_ponder:
