@@ -119,6 +119,20 @@ class EngineWrapper:
     def quit(self):
         self.engine.quit()
 
+    def process_endgame_conditions(self, board):
+        draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
+        draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
+            if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
+            board.halfmove_clock >= 2 * self.draw_conditions["sustain_turns"] and \
+            len(self.past_scores) >= self.draw_conditions["sustain_turns"] \
+            else False
+
+        resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
+        resign = max(resign_scores) <= -self.resignation_conditions["threshold"] \
+            if len(resign_scores) >= self.resignation_conditions["sustain_turns"] else False
+
+        return draw, resign
+
     @staticmethod
     def get_pretty_stat(stat_name, stat_value):
         if stat_name == "nps":
@@ -285,17 +299,7 @@ class UCIEngine(EngineWrapper):
                 self.ponder_board.push(ponder_move)
                 self.ponder(self.ponder_board, wtime, btime, winc, binc)
 
-        draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
-        draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
-            if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
-            board.halfmove_clock >= 2 * self.draw_conditions["sustain_turns"] and \
-            len(self.past_scores) >= self.draw_conditions["sustain_turns"] \
-            else False
-
-        resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
-        resign = max(resign_scores) <= -self.resignation_conditions["threshold"] \
-            if len(resign_scores) >= self.resignation_conditions["sustain_turns"] else False
-
+        draw, resign = self.process_endgame_conditions(board)
         return best_move, draw, resign
 
     def ponder(self, board, wtime, btime, winc, binc):
@@ -397,17 +401,7 @@ class XBoardEngine(EngineWrapper):
         except (KeyError, AttributeError):
             self.past_scores = []  # reset the past scores so nothing will screw up if engine doesn't report score
 
-        draw_scores = self.past_scores[-self.draw_conditions["sustain_turns"]:]
-        draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
-            if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
-            board.halfmove_clock >= 2 * self.draw_conditions["sustain_turns"] and \
-            len(self.past_scores) >= self.draw_conditions["sustain_turns"] \
-            else False
-
-        resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
-        resign = max(resign_scores) <= -self.resignation_conditions["threshold"] \
-            if len(resign_scores) >= self.resignation_conditions["sustain_turns"] else False
-
+        draw, resign = self.process_endgame_conditions(board)
         return best_move, draw, resign
 
     def print_stats(self):
