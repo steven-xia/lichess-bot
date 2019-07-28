@@ -18,7 +18,7 @@ MINIMUM_PONDER_TIME = 1000
 # connections in which Lichess compensates the time but you still need the
 # engine to make the move faster. also useful when you have an unstable
 # connection that lags every once in a while.
-LEEWAY_TIME = 0
+XBOARD_MOVE_OVERHEAD = 1000
 
 METRIC_PREFIXES = {
     10 ** 12: "T",
@@ -195,6 +195,7 @@ class UCIEngine(EngineWrapper):
         super().__init__(board, commands, options, game_end_conditions, silence_stderr, ponder_on)
         commands = commands[0] if len(commands) == 1 else commands
         self.go_commands = options.get("go_commands", {})
+        self.move_overhead = options.get("Move Overhead", XBOARD_MOVE_OVERHEAD)
 
         self.engine = chess.uci.popen_engine(commands, stderr=subprocess.DEVNULL if silence_stderr else None)
         self.engine.uci()
@@ -225,9 +226,9 @@ class UCIEngine(EngineWrapper):
         cmds = self.go_commands
 
         if board.turn == chess.WHITE:
-            wtime = max(0, wtime - LEEWAY_TIME)
+            wtime = max(0, wtime - self.move_overhead)
         else:
-            btime = max(0, btime - LEEWAY_TIME)
+            btime = max(0, btime - self.move_overhead)
 
         best_move = None
         ponder_move = None
@@ -383,11 +384,11 @@ class XBoardEngine(EngineWrapper):
     def search(self, board, wtime, btime, winc, binc):
         self.engine.setboard(board)
         if board.turn == chess.WHITE:
-            wtime = max(0, wtime - LEEWAY_TIME)
+            wtime = max(0, wtime - XBOARD_MOVE_OVERHEAD)
             self.engine.time(wtime / 10)
             self.engine.otim(btime / 10)
         else:
-            btime = max(0, btime - LEEWAY_TIME)
+            btime = max(0, btime - XBOARD_MOVE_OVERHEAD)
             self.engine.time(btime / 10)
             self.engine.otim(wtime / 10)
         best_move = self.engine.go()
