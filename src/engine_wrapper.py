@@ -141,12 +141,12 @@ class EngineWrapper:
             if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
             board.halfmove_clock >= 2 * self.draw_conditions["sustain_turns"] and \
             len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
-            is_endgame(board) \
-            else False
+            is_endgame(board) else False
 
         resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
         resign = max(resign_scores) <= -self.resignation_conditions["threshold"] \
-            if len(resign_scores) >= self.resignation_conditions["sustain_turns"] else False
+            if len(resign_scores) >= self.resignation_conditions["sustain_turns"] and \
+            is_endgame(board) else False
 
         return draw, resign
 
