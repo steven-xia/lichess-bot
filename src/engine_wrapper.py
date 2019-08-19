@@ -34,6 +34,17 @@ LARGE_NUMBER_ABBREVIATIONS = {
 
 GAME_SPEEDS = ("ultraBullet", "bullet", "blitz", "rapid", "classical")
 
+PIECES = frozenset((
+    chess.Piece(chess.KNIGHT, chess.WHITE),
+    chess.Piece(chess.KNIGHT, chess.BLACK),
+    chess.Piece(chess.BISHOP, chess.WHITE),
+    chess.Piece(chess.BISHOP, chess.BLACK),
+    chess.Piece(chess.ROOK, chess.WHITE),
+    chess.Piece(chess.ROOK, chess.BLACK),
+    chess.Piece(chess.QUEEN, chess.WHITE),
+    chess.Piece(chess.QUEEN, chess.BLACK),
+))
+
 
 def get_config(config, speed):
     speed_index = GAME_SPEEDS.index(speed)
@@ -87,6 +98,11 @@ def create_engine(config, board, game_speed):
         return UCIEngine(board, commands, options, game_end_conditions, silence_stderr, ponder)
 
 
+def is_endgame(board):
+    pieces = tuple(p for p in board.piece_map().values() if p in PIECES)
+    return len(pieces) <= 6
+
+
 class EngineWrapper:
 
     def __init__(self, board, commands, options, game_end_conditions, silence_stderr=False, ponder_on=False):
@@ -124,7 +140,8 @@ class EngineWrapper:
         draw = abs(max(draw_scores, key=abs)) <= self.draw_conditions["threshold"] \
             if board.fullmove_number >= self.draw_conditions["minimum_turns"] and \
             board.halfmove_clock >= 2 * self.draw_conditions["sustain_turns"] and \
-            len(self.past_scores) >= self.draw_conditions["sustain_turns"] \
+            len(self.past_scores) >= self.draw_conditions["sustain_turns"] and \
+            is_endgame(board) \
             else False
 
         resign_scores = self.past_scores[-self.resignation_conditions["sustain_turns"]:]
