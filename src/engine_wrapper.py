@@ -117,6 +117,8 @@ class EngineWrapper:
         self.past_scores = []
         self.is_game_over = False
 
+        self.did_first_move = False
+
     def set_time_control(self, game):
         pass
 
@@ -247,6 +249,7 @@ class UCIEngine(EngineWrapper):
     def first_search(self, board, movetime):
         self.engine.position(board)
         best_move, _ = self.engine.go(movetime=movetime)
+        self.did_first_move = True
         return best_move
 
     def search(self, board, wtime, btime, winc, binc):
@@ -397,6 +400,7 @@ class XBoardEngine(EngineWrapper):
         self.engine.setboard(board)
         self.engine.st(movetime / 1000)
         bestmove = self.engine.go()
+        self.did_first_move = True
         return bestmove
 
     def search(self, board, wtime, btime, winc, binc):
