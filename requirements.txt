@@ -1,8 +1,8 @@
-certifi==2019.3.9
+certifi==2019.11.28
 chardet==3.0.4
 idna==2.8
 python-chess==0.27.3
-PyYAML==5.1
-requests==2.21.0
-urllib3==1.24.2
-backoff==1.8.0
+PyYAML==5.2
+requests==2.22.0
+urllib3==1.25.7
+backoff==1.10.0
