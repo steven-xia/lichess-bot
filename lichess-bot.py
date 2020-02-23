@@ -1,12 +1,13 @@
 import argparse
+import functools
 import json
 import logging
-import multiprocessing
 import signal
 import threading
 import time
 import traceback
-from functools import partial
+
+from typing import Callable, List
 
 import backoff
 import chess
@@ -30,6 +31,9 @@ __version__: str = "testing"
 
 # terminated is a list so it can be accessed as a pseudo-pointer.
 _TERMINATED: list = []
+
+_QUEUE: List[dict] = []
+_CHALLENGE_QUEUE: List[model.Challenge] = []
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -58,112 +62,110 @@ def upgrade_account(li: lichess.Lichess) -> bool:
 
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=600, giveup=is_final)
-def watch_control_stream(control_queue, li):
+def watch_control_stream(li: lichess.Lichess) -> None:
     response = li.get_event_stream()
     try:
         for line in response.iter_lines():
             if line:
                 event = json.loads(line.decode('utf-8'))
-                control_queue.put_nowait(event)
+                _QUEUE.append(event)
             else:
-                control_queue.put_nowait({"type": "ping"})
+                _QUEUE.append({"type": "ping"})
     except (RemoteDisconnected, ChunkedEncodingError, ConnectionError, ProtocolError) as exception:
         logger.error("Terminating client due to connection error")
         traceback.print_exception(type(exception), exception, exception.__traceback__)
-        control_queue.put_nowait({"type": "terminated"})
+        _QUEUE.append({"type": "terminated"})
 
 
-def start(li, user_profile, engine_factory, config):
+def start(li: lichess.Lichess, user_profile: dict, engine_factory: Callable, config: dict) -> None:
+    global _QUEUE, _CHALLENGE_QUEUE
+
     challenge_config = config["challenge"]
-    max_games = challenge_config.get("concurrency", 1)
+
     logger.info("You're now connected to {} and awaiting challenges.".format(config["url"]))
-    manager = multiprocessing.Manager()
-    challenge_queue = manager.list()
-    control_queue = manager.Queue()
-    control_stream = multiprocessing.Process(target=watch_control_stream, args=[control_queue, li])
+    control_stream = threading.Thread(target=lambda: watch_control_stream(li))
     control_stream.start()
-    busy_processes = 0
-    queued_processes = 0
 
-    with logging_pool.LoggingPool(max_games + 1) as pool:
-        while not _TERMINATED:
-            event = control_queue.get()
+    game_running = True
 
-            if event["type"] == "terminated":
-                break
+    while not _TERMINATED:
+        while not _QUEUE: ...
+        event = _QUEUE.pop(0)
 
-            elif event["type"] == "local_game_done":
-                busy_processes -= 1
-                logger.info(
-                    "+++ Process Free. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes)
-                )
+        if event["type"] == "terminated":
+            break
 
-            elif event["type"] == "challenge":
-                challenge = model.Challenge(event["challenge"])
-                if challenge.is_supported(challenge_config) and not challenge.is_ignore(challenge_config):
-                    challenge_queue.append(challenge)
-                    if challenge_config.get("sort_by", "best") == "best":
-                        list_c = list(challenge_queue)
-                        list_c.sort(key=lambda c: -c.score())
-                        challenge_queue = list_c
-                elif challenge.is_ignore(challenge_config):
-                    continue
-                else:
-                    try:
-                        li.decline_challenge(challenge.id)
-                        logger.info("    Decline {}".format(challenge))
-                    except HTTPError as exception:
-                        if exception.response.status_code != 404:  # ignore missing challenge
-                            raise exception
+        elif event["type"] == "local_game_done":
+            game_running = False
 
-            elif event["type"] == "gameStart":
-                if queued_processes <= 0:
-                    logger.debug("Something went wrong. Game is starting and we don't have a queued process")
-                else:
-                    queued_processes -= 1
-                game_id = event["game"]["id"]
-                pool.apply_async(
-                    play_game, [li, game_id, control_queue, engine_factory, user_profile, config, challenge_queue]
-                )
+            logger.info(f"+++ Process Free. Total Queued: {len(_CHALLENGE_QUEUE)}. Total Used: 0")
 
-                busy_processes += 1
-                logger.info(
-                    "--- Process Used. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes)
-                )
-
-            # keep processing the queue until empty or max_games is reached
-            while (queued_processes + busy_processes) < max_games and challenge_queue:
-                challenge = challenge_queue.pop(0)
+        elif event["type"] == "challenge":
+            challenge = model.Challenge(event["challenge"])
+            if challenge.is_supported(challenge_config) and not challenge.is_ignore(challenge_config):
+                _CHALLENGE_QUEUE.append(challenge)
+                if challenge_config.get("sort_by", "best") == "best":
+                    _CHALLENGE_QUEUE = sorted(_CHALLENGE_QUEUE, key=lambda c: -c.score())
+            elif challenge.is_ignore(challenge_config):
+                continue
+            else:
                 try:
-                    response = li.accept_challenge(challenge.id)
-                    logger.info("    Accept {}".format(challenge))
-                    queued_processes += 1
-                    logger.info(
-                        "--- Process Queue. Total Queued: {}. Total Used: {}".format(queued_processes, busy_processes)
-                    )
+                    li.decline_challenge(challenge.id)
+                    logger.info("    Decline {}".format(challenge))
                 except HTTPError as exception:
-                    if exception.response.status_code == 404:  # ignore missing challenge
-                        logger.info("    Skip missing {}".format(challenge))
-                    else:
+                    if exception.response.status_code != 404:  # ignore missing challenge
                         raise exception
 
+        elif event["type"] == "gameStart":
+            game_running = True
+
+            game_id = event["game"]["id"]
+            t = threading.Thread(target=lambda: play_game(li, game_id, engine_factory, user_profile, config))
+            t.start()
+
+            logger.info(f"--- Process Used. Total Queued: {len(_CHALLENGE_QUEUE)}. Total Used: 1")
+
+        # keep processing the queue until empty or max_games is reached
+        while not game_running and _CHALLENGE_QUEUE:
+            challenge = _CHALLENGE_QUEUE.pop(0)
+            try:
+                game_running = True
+
+                _ = li.accept_challenge(challenge.id)
+                logger.info("    Accept {}".format(challenge))
+                logger.info(f"--- Process Queue. Total Queued: {len(_CHALLENGE_QUEUE)}. Total Used: 1")
+            except HTTPError as exception:
+                if exception.response.status_code == 404:  # ignore missing challenge
+                    logger.info("    Skip missing {}".format(challenge))
+                else:
+                    raise exception
+
     logger.info("Terminated")
-    control_stream.terminate()
     control_stream.join()
 
 
 @backoff.on_exception(backoff.expo, BaseException, max_time=600, giveup=is_final)
-def play_game(li, game_id, control_queue, engine_factory, user_profile, config, challenge_queue):
+def play_game(li: lichess.Lichess, game_id: str, engine_factory: Callable, user_profile: dict, config: dict) -> None:
+    global _CHALLENGE_QUEUE
+
     response = li.get_game_stream(game_id)
     lines = response.iter_lines()
 
-    # Initial response of stream will be the full game info. Store it
-    game = model.Game(json.loads(next(lines).decode('utf-8')), user_profile["username"], li.baseUrl,
-                      config.get("abort_time", 20))
+    # initial response of stream will be the full game info; store it.
+    game = model.Game(
+        json.loads(next(lines).decode('utf-8')),
+        user_profile["username"],
+        li.baseUrl,
+        config.get("abort_time", 20)
+    )
+
     board = setup_board(game)
     engine = engine_factory(board, game.speed)
-    conversation = Conversation(game, engine, li, __version__, challenge_queue, config.get("chat_commands", {}),
-                                user_profile["username"])
+
+    conversation = Conversation(
+        game, engine, li, __version__, _CHALLENGE_QUEUE, config.get("chat_commands", {}),
+        user_profile["username"]
+    )
 
     logger.info("+++ {}".format(game))
 
@@ -248,9 +250,8 @@ def play_game(li, game_id, control_queue, engine_factory, user_profile, config, 
         logger.info("--- {} Game over".format(game.url()))
         engine.is_game_over = True
         engine.quit()
-        # This can raise queue.NoFull, but that should only happen if we're not processing
-        # events fast enough and in this case I believe the exception should be raised
-        control_queue.put_nowait({"type": "local_game_done"})
+
+        _QUEUE.append({"type": "local_game_done"})
 
 
 def play_first_move(game, engine, board, li):
@@ -326,25 +327,23 @@ def is_engine_move(game, moves):
     return game.is_white == is_white_to_move(game, moves)
 
 
-def update_board(board, move):
+def update_board(board: chess.Board, move: str):
     uci_move = chess.Move.from_uci(move)
     board.push(uci_move)
     return board
 
 
-def intro():
-    return r"""
+def intro() -> str:
+    return fr"""
     .   _/|
     .  // o\
-    .  || ._)  lichess-bot %s
+    .  || ._)  lichess-bot {__version__}
     .  //__\
     .  )___(   Play on Lichess with a bot
-    """ % __version__
+    """
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
-
     parser = argparse.ArgumentParser(description='Play on Lichess with a bot')
     parser.add_argument('-u', action='store_true', help='Add this flag to upgrade your account to a bot account.')
     parser.add_argument('-v', action='store_true', help='Verbose output. Changes log level from INFO to DEBUG.')
@@ -352,23 +351,28 @@ if __name__ == "__main__":
     parser.add_argument('-l', '--logfile', help="Log file to append logs to.", default=None)
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG if args.v else logging.INFO, filename=args.logfile,
-                        format="%(asctime)-15s: %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if args.v else logging.INFO,
+        filename=args.logfile,
+        format="%(asctime)-15s: %(message)s"
+    )
     enable_color_logging(debug_lvl=logging.DEBUG if args.v else logging.INFO)
     logger.info(intro())
-    CONFIG = load_config(args.config or "./config.yml")
-    li = lichess.Lichess(CONFIG["token"], CONFIG["url"], __version__)
 
-    user_profile = li.get_profile()
+    CONFIG = load_config(args.config or "./config.yml")
+
+    lichess_obj = lichess.Lichess(CONFIG["token"], CONFIG["url"], __version__)
+    user_profile = lichess_obj.get_profile()
     username = user_profile["username"]
     is_bot = user_profile.get("title") == "BOT"
+
     logger.info("Welcome {}!".format(username))
 
     if args.u is True and is_bot is False:
-        is_bot = upgrade_account(li)
+        is_bot = upgrade_account(lichess_obj)
 
     if is_bot:
-        engine_factory = partial(engine_wrapper.create_engine, CONFIG)
-        start(li, user_profile, engine_factory, CONFIG)
+        engine_factory = functools.partial(engine_wrapper.create_engine, CONFIG)
+        start(lichess_obj, user_profile, engine_factory, CONFIG)
     else:
         logger.error("{} is not a bot account. Please upgrade it to a bot account!".format(user_profile["username"]))
