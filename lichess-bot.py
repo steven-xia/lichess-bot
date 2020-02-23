@@ -1,7 +1,6 @@
 import argparse
 import json
 import logging
-import signal
 import threading
 import time
 import traceback
@@ -37,17 +36,6 @@ _CHALLENGE_QUEUE: List[model.Challenge] = []
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def signal_handler(sig, frm):
-    global _TERMINATED
-    logger.debug("Received SIGINT. Terminating client.")
-
-    # set `_TERMINATED` to "True".
-    _TERMINATED.append(None)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-
-
 def is_final(exception) -> bool:
     return (isinstance(exception, HTTPError) and exception.response.status_code < 500) or _TERMINATED
 
@@ -65,6 +53,9 @@ def watch_control_stream(li: lichess.Lichess) -> None:
     response = li.get_event_stream()
     try:
         for line in response.iter_lines():
+            if _TERMINATED:
+                return
+
             if line:
                 event = json.loads(line.decode('utf-8'))
                 _QUEUE.append(event)
@@ -139,6 +130,7 @@ def start(li: lichess.Lichess, user_profile: dict, engine_factory: Callable, con
                 else:
                     raise exception
 
+    _TERMINATED.append(None)
     logger.info("Terminated")
     control_stream.join()
 
@@ -374,6 +366,11 @@ if __name__ == "__main__":
 
     if is_bot:
         engine_foo = lambda *args, **kwargs: engine_wrapper.create_engine(CONFIG, *args, **kwargs)
-        start(lichess_obj, profile_dict, engine_foo, CONFIG)
+
+        try:
+            start(lichess_obj, profile_dict, engine_foo, CONFIG)
+        except KeyboardInterrupt:
+            logger.debug("Received SIGINT. Terminating client.")
+            _TERMINATED.append(None)
     else:
         logger.error("{} is not a bot account. Please upgrade it to a bot account!".format(profile_dict["username"]))
