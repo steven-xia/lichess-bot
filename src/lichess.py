@@ -1,112 +1,119 @@
-from urllib.parse import urljoin
-
-import requests
-from requests.exceptions import ConnectionError, HTTPError
-from urllib3.exceptions import ProtocolError
-
-try:
-    from http.client import RemoteDisconnected
-    # New in version 3.5: Previously, BadStatusLine('') was raised.
-except ImportError:
-    from http.client import BadStatusLine as RemoteDisconnected
+from typing import Dict, Optional
 
 import backoff
+import requests
+from urllib.parse import urljoin
 
-ENDPOINTS = {
-    "profile": "/api/account",
-    "playing": "/api/account/playing",
-    "stream": "/api/bot/game/stream/{}",
-    "stream_event": "/api/stream/event",
-    "game": "/api/bot/game/{}",
-    "move": "/api/bot/game/{}/move/{}",
-    "chat": "/api/bot/game/{}/chat",
+from requests.exceptions import ConnectionError, HTTPError
+from urllib3.exceptions import ProtocolError
+from http.client import RemoteDisconnected
+
+_TERMINATED: list = []
+
+_BACKOFF_EXCEPTIONS: tuple = (
+    ConnectionError,
+    HTTPError,
+    ProtocolError,
+    RemoteDisconnected,
+)
+
+_ENDPOINTS: Dict[str, str] = {
     "abort": "/api/bot/game/{}/abort",
     "accept": "/api/challenge/{}/accept",
+    "chat": "/api/bot/game/{}/chat",
     "decline": "/api/challenge/{}/decline",
+    "game": "/api/bot/game/{}",
+    "move": "/api/bot/game/{}/move/{}",
+    "playing": "/api/account/playing",
+    "profile": "/api/account",
+    "resign": "/api/bot/game/{}/resign",
+    "stream": "/api/bot/game/stream/{}",
+    "stream_event": "/api/stream/event",
     "upgrade": "/api/bot/account/upgrade",
-    "resign": "/api/bot/game/{}/resign"
 }
 
 
-terminated = False
+def is_final(exc) -> bool:
+    return (isinstance(exc, HTTPError) and exc.response.status_code < 500) or _TERMINATED
 
 
-def is_final(exception):
-    return (isinstance(exception, HTTPError) and exception.response.status_code < 500) or terminated
-
-
-# docs: https://lichess.org/api
+# lichess api documentation: https://lichess.org/api
 class Lichess:
-    def __init__(self, token, url, version):
-        self.version = version
-        self.header = {
+    def __init__(self, token: str, url: str, version: str):
+        self.version: str = version
+        self.header: Dict[str, str] = {
             "Authorization": "Bearer {}".format(token)
         }
 
-        self.baseUrl = url
-        self.session = requests.Session()
+        self.baseUrl: str = url
+        self.session: requests.Session = requests.Session()
         self.session.headers.update(self.header)
         self.set_user_agent("?")
 
-    @backoff.on_exception(backoff.expo, (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError), max_time=120,
-                          giveup=is_final)
-    def api_get(self, path):
+    @backoff.on_exception(backoff.expo, _BACKOFF_EXCEPTIONS, max_time=120, giveup=is_final)
+    def _api_get(self, path: str) -> dict:
         url = urljoin(self.baseUrl, path)
         response = self.session.get(url)
         response.raise_for_status()
         return response.json()
 
-    @backoff.on_exception(backoff.expo, (RemoteDisconnected, ConnectionError, ProtocolError, HTTPError), max_time=20,
-                          giveup=is_final)
-    def api_post(self, path, data=None, params=None):
+    @backoff.on_exception(backoff.expo, _BACKOFF_EXCEPTIONS, max_time=20, giveup=is_final)
+    def _api_post(self, path: str, data: Optional[dict] = None, params: Optional[dict] = None) -> dict:
         url = urljoin(self.baseUrl, path)
         response = self.session.post(url, data=data, params=params)
         response.raise_for_status()
         return response.json()
 
-    def get_game(self, game_id):
-        return self.api_get(ENDPOINTS["game"].format(game_id))
+    def abort(self, game_id: str) -> dict:
+        return self._api_post(_ENDPOINTS["abort"].format(game_id))
 
-    def upgrade_to_bot_account(self):
-        return self.api_post(ENDPOINTS["upgrade"])
+    def accept_challenge(self, challenge_id: str) -> dict:
+        return self._api_post(_ENDPOINTS["accept"].format(challenge_id))
 
-    def make_move(self, game_id, move, offering_draw=False):
-        return self.api_post(ENDPOINTS["move"].format(game_id, move),
-                             params={"offeringDraw": str(offering_draw).lower()})
-
-    def chat(self, game_id, room, text):
+    def chat(self, game_id: str, room: str, text: str) -> dict:
         payload = {'room': room, 'text': text}
-        return self.api_post(ENDPOINTS["chat"].format(game_id), data=payload)
+        return self._api_post(_ENDPOINTS["chat"].format(game_id), data=payload)
 
-    def abort(self, game_id):
-        return self.api_post(ENDPOINTS["abort"].format(game_id))
+    def decline_challenge(self, challenge_id: str) -> dict:
+        return self._api_post(_ENDPOINTS["decline"].format(challenge_id))
 
-    def get_event_stream(self):
-        url = urljoin(self.baseUrl, ENDPOINTS["stream_event"])
+    def get_event_stream(self) -> requests.Response:
+        url = urljoin(self.baseUrl, _ENDPOINTS["stream_event"])
         return requests.get(url, headers=self.header, stream=True)
 
-    def get_game_stream(self, game_id):
-        url = urljoin(self.baseUrl, ENDPOINTS["stream"].format(game_id))
+    def get_game(self, game_id: str) -> dict:
+        return self._api_get(_ENDPOINTS["game"].format(game_id))
+
+    def get_game_stream(self, game_id: str) -> requests.Response:
+        url = urljoin(self.baseUrl, _ENDPOINTS["stream"].format(game_id))
         return requests.get(url, headers=self.header, stream=True)
 
-    def accept_challenge(self, challenge_id):
-        return self.api_post(ENDPOINTS["accept"].format(challenge_id))
+    def get_ongoing_games(self) -> dict:
+        ongoing_games = self._api_get(_ENDPOINTS["playing"])["nowPlaying"]
+        return ongoing_games
 
-    def decline_challenge(self, challenge_id):
-        return self.api_post(ENDPOINTS["decline"].format(challenge_id))
-
-    def get_profile(self):
-        profile = self.api_get(ENDPOINTS["profile"])
+    def get_profile(self) -> dict:
+        profile = self._api_get(_ENDPOINTS["profile"])
         self.set_user_agent(profile["username"])
         return profile
 
-    def get_ongoing_games(self):
-        ongoing_games = self.api_get(ENDPOINTS["playing"])["nowPlaying"]
-        return ongoing_games
+    def make_move(self, game_id: str, move: str, offering_draw: bool = False) -> dict:
+        return self._api_post(
+            _ENDPOINTS["move"].format(game_id, move),
+            params={"offeringDraw": str(offering_draw).lower()}
+        )
 
-    def resign(self, game_id):
-        self.api_post(ENDPOINTS["resign"].format(game_id))
+    def resign(self, game_id: str) -> None:
+        self._api_post(_ENDPOINTS["resign"].format(game_id))
 
-    def set_user_agent(self, username):
+    def set_user_agent(self, username: str) -> None:
         self.header.update({"User-Agent": "lichess-bot/{} user:{}".format(self.version, username)})
         self.session.headers.update(self.header)
+
+    def upgrade_to_bot_account(self) -> dict:
+        return self._api_post(_ENDPOINTS["upgrade"])
+
+
+def __init__(terminated_pointer: list):
+    global _TERMINATED
+    _TERMINATED = terminated_pointer

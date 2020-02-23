@@ -20,34 +20,36 @@ from src.color_logger import enable_color_logging
 from src.config import load_config
 from src.conversation import Conversation, ChatLine
 
-logger = logging.getLogger(__name__)
-
 try:
-    from http.client import RemoteDisconnected
     # New in version 3.5: Previously, BadStatusLine('') was raised.
+    from http.client import RemoteDisconnected
 except ImportError:
     from http.client import BadStatusLine as RemoteDisconnected
 
-__version__ = "1.2.3 [unofficial]"
+__version__: str = "testing"
 
-terminated = False
+# terminated is a list so it can be accessed as a pseudo-pointer.
+_TERMINATED: list = []
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
-def signal_handler(signal, frame):
-    global terminated
+def signal_handler(sig, frm):
+    global _TERMINATED
     logger.debug("Received SIGINT. Terminating client.")
-    terminated = True
-    lichess.terminated = True
+
+    # set `_TERMINATED` to "True".
+    _TERMINATED.append(None)
 
 
 signal.signal(signal.SIGINT, signal_handler)
 
 
-def is_final(exception):
-    return (isinstance(exception, HTTPError) and exception.response.status_code < 500) or terminated
+def is_final(exception) -> bool:
+    return (isinstance(exception, HTTPError) and exception.response.status_code < 500) or _TERMINATED
 
 
-def upgrade_account(li):
+def upgrade_account(li: lichess.Lichess) -> bool:
     if li.upgrade_to_bot_account() is None:
         return False
 
@@ -84,7 +86,7 @@ def start(li, user_profile, engine_factory, config):
     queued_processes = 0
 
     with logging_pool.LoggingPool(max_games + 1) as pool:
-        while not terminated:
+        while not _TERMINATED:
             event = control_queue.get()
 
             if event["type"] == "terminated":
