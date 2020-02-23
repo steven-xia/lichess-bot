@@ -1,26 +1,45 @@
-class Conversation:
-    command_prefix = "!"
-    username_prefix = "@"
-    spectator_prefix = "spectator<"
-    built_in_commands = ["name", "howto", "eval", "queue", "chat"]
+import typing
 
-    def __init__(self, game, engine, xhr, version, challenge_queue, commands, username):
-        self.game = game
-        self.engine = engine
-        self.xhr = xhr
-        self.version = version
-        self.challengers = challenge_queue
-        self._commands = commands
-        self.username = username
+import src.model
+import src.engine_wrapper
+import src.lichess
+
+
+class Conversation:
+    command_prefix: str = "!"
+    username_prefix: str = "@"
+    spectator_prefix: str = "spectator<"
+    built_in_commands: typing.List[str] = [
+        "name", "howto", "eval", "queue", "chat"
+    ]
+
+    def __init__(self, game: src.model.Game, engine: src.engine_wrapper.UCIEngine,
+                 xhr: src.lichess.Lichess, version: str, challenge_queue: list,
+                 commands: typing.Dict[str, str], username: str):
+        self.game: src.model.Game = game
+        self.engine: src.engine_wrapper.UCIEngine = engine
+        self.xhr: src.lichess.Lichess = xhr
+        self.version: str = version
+        self.challengers: list = challenge_queue
+        self._commands: typing.Dict[str, str] = commands
+        self.username: str = username
 
         self._commands = {k.lower(): v for k, v in self._commands.items()}
-        self._commands_string = Conversation.command_prefix + ", {}".format(Conversation.command_prefix).join(
-            frozenset(Conversation.built_in_commands + list(commands.keys())))
+        self._commands_string: str = Conversation.command_prefix + (
+            ", {}".format(Conversation.command_prefix).join(
+                frozenset(Conversation.built_in_commands + list(commands.keys()))
+            )
+        )
 
-        self._username_string = "{}{} ".format(Conversation.username_prefix, username).lower()
+        self._username_string: str = "{}{} ".format(
+            Conversation.username_prefix, username
+        ).lower()
 
-    def react(self, line, game):
-        print("*** {} [{}] {}: {}".format(self.game.url(), line.room, line.username, line.text.encode("utf-8")))
+    def react(self, line: "ChatLine", game: src.model.Game) -> None:
+        print("*** {} [{}] {}: {}".format(
+            self.game.url(), line.room, line.username, line.text.encode("utf-8")
+        ))
+
         if line.text[:len(self._username_string)].lower() == self._username_string and \
                 line.room == "spectator":
             self.forward_to_private(line, line.text[len(self._username_string):])

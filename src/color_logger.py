@@ -1,16 +1,19 @@
 """
-@file: Colorer.py
+color_logger.py
 
-Script which allows colored logging output with multiplattform support.
+Script which allows colored logging output with multi-platform support.
 The script is based on this post and was slightly adjusted:
 # https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
 
-'Here is a solution that should work on any platform. If it doesn't just tell me and I will update it.
+'Here is a solution that should work on any platform. If it doesn't
+just tell me and I will update it.
 
-How it works: on platform supporting ANSI escapes is using them (non-Windows) and on Windows
-it does use API calls to change the console colors.
+How it works: on platform supporting ANSI escapes is using them
+(non-Windows) and on Windows it does use API calls to change the
+console colors.
 
-The script does hack the logging.StreamHandler.emit method from standard library adding a wrapper to it.'
+The script does hack the logging.StreamHandler.emit method from
+standard library adding a wrapper to it.'
 
 by Sorin & Dave
 """
@@ -74,16 +77,16 @@ def add_coloring_to_emit_windows(fn):
         BACKGROUND_GREY = 0x0070
         BACKGROUND_INTENSITY = 0x0080  # background color is intensified.
 
-        levelno = args[1].levelno
-        if levelno >= 50:
+        level_num = args[1].levelno
+        if level_num >= 50:
             color = BACKGROUND_YELLOW | FOREGROUND_RED | FOREGROUND_INTENSITY | BACKGROUND_INTENSITY
-        elif levelno >= 40:
+        elif level_num >= 40:
             color = FOREGROUND_RED | FOREGROUND_INTENSITY
-        elif levelno >= 30:
+        elif level_num >= 30:
             color = FOREGROUND_YELLOW | FOREGROUND_INTENSITY
-        elif levelno >= 20:
+        elif level_num >= 20:
             color = FOREGROUND_GREEN
-        elif levelno >= 10:
+        elif level_num >= 10:
             color = FOREGROUND_MAGENTA
         else:
             color = FOREGROUND_WHITE
@@ -104,19 +107,19 @@ def add_coloring_to_emit_windows(fn):
 def add_coloring_to_emit_ansi(fn):
     # add methods we need to the class
     def new(*args):
-        levelno = args[1].levelno
-        if levelno >= 50:
+        level_num = args[1].levelno
+        if level_num >= 50:
             color = '\x1b[31m'  # red
-        elif levelno >= 40:
+        elif level_num >= 40:
             color = '\x1b[31m'  # red
-        elif levelno >= 30:
+        elif level_num >= 30:
             color = '\x1b[33m'  # yellow
-        elif levelno >= 20:
+        elif level_num >= 20:
             color = '\x1b[94m'  # light blue
-        elif levelno >= 10:
+        elif level_num >= 10:
             color = '\x1b[32m'  # green
-            # color = '\x1b[90m' # bright black
-            # color = '\x1b[35m' # pink
+            # color = '\x1b[90m'  # bright black
+            # color = '\x1b[35m'  # pink
         else:
             color = '\x1b[0m'  # normal
 
