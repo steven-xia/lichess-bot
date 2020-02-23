@@ -1,5 +1,4 @@
 import argparse
-import functools
 import json
 import logging
 import signal
@@ -7,16 +6,16 @@ import threading
 import time
 import traceback
 
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import backoff
 import chess
 import chess.polyglot
-from chess.variant import find_variant
+import chess.variant
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
 from urllib3.exceptions import ProtocolError
 
-from src import lichess, model, engine_wrapper, logging_pool
+from src import lichess, model, engine_wrapper
 from src.color_logger import enable_color_logging
 from src.config import load_config
 from src.conversation import Conversation, ChatLine
@@ -254,7 +253,8 @@ def play_game(li: lichess.Lichess, game_id: str, engine_factory: Callable, user_
         _QUEUE.append({"type": "local_game_done"})
 
 
-def play_first_move(game, engine, board, li):
+def play_first_move(game: model.Game, engine: engine_wrapper.EngineWrapper,
+                    board: chess.Board, li: lichess.Lichess) -> bool:
     moves = game.state["moves"].split()
     if is_engine_move(game, moves):
         # need to hard code first movetime since Lichess has 30 sec limit.
@@ -264,19 +264,20 @@ def play_first_move(game, engine, board, li):
     return False
 
 
-def play_first_book_move(game, engine, board, li, config):
+def play_first_book_move(game: model.Game, engine: engine_wrapper.EngineWrapper,
+                         board: chess.Board, li: lichess.Lichess, config: dict) -> bool:
     moves = game.state["moves"].split()
     if is_engine_move(game, moves):
         book_move = get_book_move(board, config)
         if book_move:
-            li.make_move(game.id, book_move)
+            li.make_move(game.id, str(book_move))
             return True
         else:
             return play_first_move(game, engine, board, li)
     return False
 
 
-def get_book_move(board, config):
+def get_book_move(board: chess.Board, config: dict) -> Optional[chess.Move]:
     if board.uci_variant == "chess":
         book = config["standard"]
     else:
@@ -304,13 +305,13 @@ def get_book_move(board, config):
     return move
 
 
-def setup_board(game):
+def setup_board(game: model.Game) -> chess.Board:
     if game.variant_name.lower() == "chess960":
         board = chess.Board(game.initial_fen, chess960=True)
     elif game.variant_name == "From Position":
         board = chess.Board(game.initial_fen)
     else:
-        board = find_variant(game.variant_name)()
+        board = chess.variant.find_variant(game.variant_name)()
 
     moves = game.state["moves"].split()
     for move in moves:
@@ -319,15 +320,15 @@ def setup_board(game):
     return board
 
 
-def is_white_to_move(game, moves):
+def is_white_to_move(game: model.Game, moves: list) -> bool:
     return len(moves) % 2 == (0 if game.white_starts else 1)
 
 
-def is_engine_move(game, moves):
+def is_engine_move(game: model.Game, moves: list) -> bool:
     return game.is_white == is_white_to_move(game, moves)
 
 
-def update_board(board: chess.Board, move: str):
+def update_board(board: chess.Board, move: str) -> chess.Board:
     uci_move = chess.Move.from_uci(move)
     board.push(uci_move)
     return board
@@ -349,30 +350,30 @@ if __name__ == "__main__":
     parser.add_argument('-v', action='store_true', help='Verbose output. Changes log level from INFO to DEBUG.')
     parser.add_argument('--config', help='Specify a configuration file (defaults to ./config.yml)')
     parser.add_argument('-l', '--logfile', help="Log file to append logs to.", default=None)
-    args = parser.parse_args()
+    arguments = parser.parse_args()
 
     logging.basicConfig(
-        level=logging.DEBUG if args.v else logging.INFO,
-        filename=args.logfile,
+        level=logging.DEBUG if arguments.v else logging.INFO,
+        filename=arguments.logfile,
         format="%(asctime)-15s: %(message)s"
     )
-    enable_color_logging(debug_lvl=logging.DEBUG if args.v else logging.INFO)
+    enable_color_logging(debug_lvl=logging.DEBUG if arguments.v else logging.INFO)
     logger.info(intro())
 
-    CONFIG = load_config(args.config or "./config.yml")
+    CONFIG = load_config(arguments.config or "./config.yml")
 
     lichess_obj = lichess.Lichess(CONFIG["token"], CONFIG["url"], __version__)
-    user_profile = lichess_obj.get_profile()
-    username = user_profile["username"]
-    is_bot = user_profile.get("title") == "BOT"
+    profile_dict = lichess_obj.get_profile()
+    username = profile_dict["username"]
+    is_bot = profile_dict.get("title") == "BOT"
 
     logger.info("Welcome {}!".format(username))
 
-    if args.u is True and is_bot is False:
+    if arguments.u is True and is_bot is False:
         is_bot = upgrade_account(lichess_obj)
 
     if is_bot:
-        engine_factory = functools.partial(engine_wrapper.create_engine, CONFIG)
-        start(lichess_obj, user_profile, engine_factory, CONFIG)
+        engine_foo = lambda *args, **kwargs: engine_wrapper.create_engine(CONFIG, *args, **kwargs)
+        start(lichess_obj, profile_dict, engine_foo, CONFIG)
     else:
-        logger.error("{} is not a bot account. Please upgrade it to a bot account!".format(user_profile["username"]))
+        logger.error("{} is not a bot account. Please upgrade it to a bot account!".format(profile_dict["username"]))
