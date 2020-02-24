@@ -1,13 +1,7 @@
 __pycache__
 \.idea/
 
-config.yml
+config*.yml
 
 /engines/*
 !/engines/README.md
-
-config_JeffIO.yml
-config_JeffIO_2.yml
-lichess-bot_JeffIO.bat
-lichess-bot_JeffIO_2.bat
-*bin
