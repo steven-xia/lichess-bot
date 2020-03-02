@@ -1,7 +1,11 @@
-__pycache__
-\.idea/
+# python and ide files
+__pycache__/
+venv/
 
+.idea/
+
+# per-user configuration files
 config*.yml
 
-/engines/*
-!/engines/README.md
+engines/*
+!engines/README.md
